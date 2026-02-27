@@ -10,15 +10,16 @@ export class FpsCounter extends Container {
 
     const style = new TextStyle({
       fontFamily: "monospace",
-      fontSize: 12,
+      fontSize: 24,
       fill: 0xffffff,
       stroke: { color: 0x008000, width: 3 },
     });
 
     this.fpsText = new Text({ text: "FPS: 0", style });
+    this.fpsText.anchor.set(1, 0);
     this.addChild(this.fpsText);
 
-    this.position.set(8, 8);
+    this.position.set(this.app.screen.width - 8, 8);
     this.app.stage.addChild(this);
 
     this.app.ticker.add((ticker) => {
@@ -29,6 +30,6 @@ export class FpsCounter extends Container {
   update(deltaMS: number): void {
     const fps = Math.round(1000 / Math.max(deltaMS, 0.0001));
     this.fpsText.text = `FPS: ${fps}`;
-    this.position.set(8, 8);
+    this.position.set(this.app.screen.width - 8, 8);
   }
 }
