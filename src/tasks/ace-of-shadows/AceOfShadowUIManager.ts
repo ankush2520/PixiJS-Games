@@ -50,10 +50,14 @@ export class AceOfShadowUIManager extends Container {
     if (iconType === "play") {
       // Play triangle icon (pointing right)
       icon.poly([
-        18, 14,    // Top left
-        18, 31,    // Bottom left
-        30, 22.5,  // Right point
-        18, 14     // Back to top
+        18,
+        14, // Top left
+        18,
+        31, // Bottom left
+        30,
+        22.5, // Right point
+        18,
+        14, // Back to top
       ]);
       icon.fill({ color: 0xffffff });
     } else if (iconType === "reset") {
@@ -63,10 +67,14 @@ export class AceOfShadowUIManager extends Container {
 
       // Arrow head pointing right at the top
       icon.poly([
-        30.5, 18,  // Arrow point
-        28, 15,    // Top
-        28, 21,    // Bottom
-        30.5, 18   // Back to point
+        30.5,
+        18, // Arrow point
+        28,
+        15, // Top
+        28,
+        21, // Bottom
+        30.5,
+        18, // Back to point
       ]);
       icon.fill({ color: 0xffffff });
     }

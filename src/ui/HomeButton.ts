@@ -26,10 +26,14 @@ export class HomeButton extends Container {
 
     // Draw home icon (house) - roof triangle
     this.background.poly([
-      22.5, 12,  // Top point
-      14, 20,    // Bottom left
-      31, 20,    // Bottom right
-      22.5, 12   // Back to top
+      22.5,
+      12, // Top point
+      14,
+      20, // Bottom left
+      31,
+      20, // Bottom right
+      22.5,
+      12, // Back to top
     ]);
     this.background.fill({ color: 0xffffff });
 
