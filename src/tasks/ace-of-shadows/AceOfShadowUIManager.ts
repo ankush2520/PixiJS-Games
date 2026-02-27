@@ -21,7 +21,6 @@ export class AceOfShadowUIManager extends Container {
     this.addChild(this.startButton);
     this.addChild(this.resetButton);
     this.addChild(this.counterDisplay);
-    this.addChild(this.titleDisplay);
 
     this.setupEventListeners();
   }
@@ -123,29 +122,37 @@ export class AceOfShadowUIManager extends Container {
   }
 
   resize(width: number, height: number): void {
-    const isMobile = width < 600;
+    // Counter - centered at top
+    this.counterDisplay.anchor.set(0.5);
+    this.counterDisplay.style.fontSize = 22;
+    this.counterDisplay.position.set(width / 2, 30);
 
-    // Title
-    this.titleDisplay.anchor.set(0.5);
-    this.titleDisplay.style.fontSize = isMobile ? 20 : 24;
-    this.titleDisplay.position.set(width / 2, isMobile ? 20 : 30);
+    // Calculate grid layout parameters
+    const isPortrait = width < height;
+    const topPadding = 60;
+    const bottomPadding = 90;
+    const availableHeight = height - topPadding - bottomPadding;
+    const boardCenterY = topPadding + availableHeight / 2;
 
-    // Buttons - centered below title with proper spacing
+    const spacingY = 180;
+    const cardHeight = 140;
+    const rows = isPortrait ? 3 : 2; // Portrait: 3 rows, Landscape: 2 rows
+    const lastRowOffset = ((rows - 1) / 2) * spacingY;
+    const cardHalfHeight = cardHeight / 2;
+    const gridBottomY = boardCenterY + lastRowOffset + cardHalfHeight;
+
+    // Buttons - positioned 1.5 * buttonSize below grid (desktop) or 0.75 * buttonSize (mobile)
     const buttonSize = 45;
-    const buttonSpacing = isMobile ? 15 : 20;
+    const buttonGap = isPortrait ? buttonSize * 0.75 : buttonSize * 1.5;
+    const buttonSpacing = 20;
     const totalWidth = buttonSize * 2 + buttonSpacing;
     const buttonsStartX = (width - totalWidth) / 2;
-    const buttonsY = isMobile ? 50 : 70;
+    const buttonsY = gridBottomY + buttonGap;
 
     this.startButton.position.set(buttonsStartX, buttonsY);
     this.resetButton.position.set(
       buttonsStartX + buttonSize + buttonSpacing,
       buttonsY,
     );
-
-    // Counter at bottom
-    this.counterDisplay.anchor.set(0.5);
-    this.counterDisplay.style.fontSize = isMobile ? 14 : 18;
-    this.counterDisplay.position.set(width / 2, height - (isMobile ? 20 : 30));
   }
 }

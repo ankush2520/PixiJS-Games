@@ -8,6 +8,8 @@ export class AceOfShadowsBoard extends Container {
   private movedCards = 0;
   private lastWidth = 0;
   private lastHeight = 0;
+  private animationFrameIds: Set<number> = new Set();
+  private isAnimating = false;
 
   get cardsMovedCount(): number {
     return this.movedCards;
@@ -22,7 +24,14 @@ export class AceOfShadowsBoard extends Container {
   }
 
   resize(width: number, height: number): void {
-    this.position.set(width / 2, height / 2);
+    // Desktop layout: center board with reserved space for UI
+    // Top padding: ~60px, Bottom padding: ~90px
+    const topPadding = 60;
+    const bottomPadding = 90;
+    const availableHeight = height - topPadding - bottomPadding;
+    const boardCenterY = topPadding + availableHeight / 2;
+
+    this.position.set(width / 2, boardCenterY);
 
     // Detect orientation change and rebuild layout
     const isPortrait = width < height;
@@ -167,25 +176,51 @@ export class AceOfShadowsBoard extends Container {
     if (this.moveInterval) {
       return; // Already running
     }
+    this.isAnimating = true;
     this.moveInterval = setInterval(() => {
       this.moveCardWithAnimation();
     }, 1000) as unknown as number;
   }
 
   stopAnimation(): void {
+    this.isAnimating = false;
+
     if (this.moveInterval) {
       clearInterval(this.moveInterval);
       this.moveInterval = undefined;
     }
+
+    // Cancel all ongoing animation frames
+    this.animationFrameIds.forEach((id) => cancelAnimationFrame(id));
+    this.animationFrameIds.clear();
   }
 
   resetCards(): void {
+    // Stop all animations immediately
     this.stopAnimation();
+
     this.currentTargetStack = 1;
     this.movedCards = 0;
 
-    // Move all cards back to first stack
     const firstStack = this.stacks[0];
+
+    // Collect all cards that are currently being animated (on the board)
+    const animatingCards: Graphics[] = [];
+    for (let i = this.children.length - 1; i >= 0; i--) {
+      const child = this.children[i];
+      // Check if it's a card (Graphics) and not a stack (Container)
+      if (child instanceof Graphics && !this.stacks.includes(child as any)) {
+        animatingCards.push(child);
+      }
+    }
+
+    // Move animating cards to first stack immediately
+    for (const card of animatingCards) {
+      this.removeChild(card);
+      firstStack.addChild(card);
+    }
+
+    // Move all cards from other stacks back to first stack
     for (let i = 1; i < this.stacks.length; i++) {
       const stack = this.stacks[i];
       // Get all cards (skip placeholder at index 0)
@@ -255,7 +290,16 @@ export class AceOfShadowsBoard extends Container {
     const startTime = Date.now();
     const duration = 2000;
 
+    this.isAnimating = true;
+    let frameId: number;
+
     const animate = () => {
+      // Stop animation if reset was called
+      if (!this.isAnimating) {
+        this.animationFrameIds.delete(frameId);
+        return;
+      }
+
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
@@ -266,9 +310,11 @@ export class AceOfShadowsBoard extends Container {
       card.y = startY + (targetY - startY) * easeProgress;
 
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        frameId = requestAnimationFrame(animate);
+        this.animationFrameIds.add(frameId);
       } else {
         // Animation complete
+        this.animationFrameIds.delete(frameId);
         this.removeChild(card);
         toStack.addChild(card);
         this.relayoutStack(toStack);
@@ -276,7 +322,8 @@ export class AceOfShadowsBoard extends Container {
       }
     };
 
-    requestAnimationFrame(animate);
+    frameId = requestAnimationFrame(animate);
+    this.animationFrameIds.add(frameId);
   }
 
   destroy(options?: any): void {
