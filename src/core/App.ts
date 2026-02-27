@@ -1,7 +1,7 @@
 import { Application } from "pixi.js";
 import { SceneManager } from "./SceneManager";
 import { MenuScene } from "../scenes/MenuScene";
-import { FpsCounter } from "../ui/FpsCounter";
+import { FpsCounter } from "../Common_UI/FpsCounter";
 import { AceOfShadowsScene } from "../scenes/AceOfShadowsScene";
 import { MagicWordsScene } from "../scenes/MagicWordsScene";
 import { PhoenixFlameScene } from "../scenes/PhoenixFlameScene";
@@ -9,6 +9,7 @@ import { PhoenixFlameScene } from "../scenes/PhoenixFlameScene";
 export class App {
   private readonly app: Application;
   private sceneManager: SceneManager | null = null;
+  private fpsCounter: FpsCounter | null = null;
 
   constructor() {
     this.app = new Application();
@@ -40,6 +41,7 @@ export class App {
         this.app.renderer.width,
         this.app.renderer.height,
       );
+      this.fpsCounter?.resize();
     });
 
     const resizeCurrentScene = (): void => {
@@ -71,6 +73,6 @@ export class App {
     showMenu();
 
     // Add global FPS counter last so it renders on top
-    new FpsCounter(this.app);
+    this.fpsCounter = new FpsCounter(this.app);
   }
 }

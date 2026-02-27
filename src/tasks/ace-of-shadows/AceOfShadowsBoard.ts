@@ -77,7 +77,7 @@ export class AceOfShadowsBoard extends Container {
 
     const cardWidth = 100;
     const cardHeight = 140;
-    const spacingX = 130;
+    const spacingX = isPortrait ? 145 : 170;
     const spacingY = 180;
 
     // Portrait mode: 2 columns, 3 rows

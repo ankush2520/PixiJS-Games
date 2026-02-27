@@ -13,8 +13,8 @@ export class AceOfShadowUIManager extends Container {
     private onResetClick: () => void,
   ) {
     super();
-    this.startButton = this.createButton("Start", 0x4ecdc4);
-    this.resetButton = this.createButton("Reset", 0xff6b6b);
+    this.startButton = this.createIconButton("play", 0x22c55e);
+    this.resetButton = this.createIconButton("reset", 0xef4444);
     this.counterDisplay = this.createCounterDisplay();
     this.titleDisplay = this.createTitleDisplay();
 
@@ -30,27 +30,48 @@ export class AceOfShadowUIManager extends Container {
     this.board = board;
   }
 
-  private createButton(label: string, color: number): Container {
+  private createIconButton(
+    iconType: "play" | "reset",
+    color: number,
+  ): Container {
     const button = new Container();
 
     const bg = new Graphics();
-    bg.rect(0, 0, 120, 40);
+
+    // Background with rounded corners
+    bg.roundRect(0, 0, 45, 45, 8);
     bg.fill(color);
     bg.stroke({ width: 2, color: 0xffffff });
     button.addChild(bg);
 
-    const text = new Text({
-      text: label,
-      style: new TextStyle({
-        fontFamily: "Arial",
-        fontSize: 18,
-        fill: 0xffffff,
-      }),
-    });
-    text.anchor.set(0.5);
-    text.position.set(60, 20);
-    button.addChild(text);
+    // Draw icon
+    const icon = new Graphics();
 
+    if (iconType === "play") {
+      // Play triangle icon (pointing right)
+      icon.poly([
+        18, 14,    // Top left
+        18, 31,    // Bottom left
+        30, 22.5,  // Right point
+        18, 14     // Back to top
+      ]);
+      icon.fill({ color: 0xffffff });
+    } else if (iconType === "reset") {
+      // Reset circular arrow icon
+      icon.arc(22.5, 22.5, 8, 0.5, Math.PI * 2 - 0.5);
+      icon.stroke({ width: 2.5, color: 0xffffff });
+
+      // Arrow head pointing right at the top
+      icon.poly([
+        30.5, 18,  // Arrow point
+        28, 15,    // Top
+        28, 21,    // Bottom
+        30.5, 18   // Back to point
+      ]);
+      icon.fill({ color: 0xffffff });
+    }
+
+    button.addChild(icon);
     button.eventMode = "static";
     button.cursor = "pointer";
 
@@ -102,15 +123,15 @@ export class AceOfShadowUIManager extends Container {
     this.titleDisplay.position.set(width / 2, isMobile ? 20 : 30);
 
     // Buttons - centered below title with proper spacing
-    const buttonWidth = 120;
+    const buttonSize = 45;
     const buttonSpacing = isMobile ? 15 : 20;
-    const totalWidth = buttonWidth * 2 + buttonSpacing;
+    const totalWidth = buttonSize * 2 + buttonSpacing;
     const buttonsStartX = (width - totalWidth) / 2;
     const buttonsY = isMobile ? 50 : 70;
 
     this.startButton.position.set(buttonsStartX, buttonsY);
     this.resetButton.position.set(
-      buttonsStartX + buttonWidth + buttonSpacing,
+      buttonsStartX + buttonSize + buttonSpacing,
       buttonsY,
     );
 
