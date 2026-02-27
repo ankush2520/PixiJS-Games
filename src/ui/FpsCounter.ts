@@ -1,0 +1,34 @@
+import { Application, Container, Text, TextStyle } from "pixi.js";
+
+export class FpsCounter extends Container {
+  private readonly app: Application;
+  public readonly fpsText: Text;
+
+  constructor(app: Application) {
+    super();
+    this.app = app;
+
+    const style = new TextStyle({
+      fontFamily: "monospace",
+      fontSize: 12,
+      fill: 0xffffff,
+      stroke: { color: 0x008000, width: 3 },
+    });
+
+    this.fpsText = new Text({ text: "FPS: 0", style });
+    this.addChild(this.fpsText);
+
+    this.position.set(8, 8);
+    this.app.stage.addChild(this);
+
+    this.app.ticker.add((ticker) => {
+      this.update(ticker.deltaMS);
+    });
+  }
+
+  update(deltaMS: number): void {
+    const fps = Math.round(1000 / Math.max(deltaMS, 0.0001));
+    this.fpsText.text = `FPS: ${fps}`;
+    this.position.set(8, 8);
+  }
+}
