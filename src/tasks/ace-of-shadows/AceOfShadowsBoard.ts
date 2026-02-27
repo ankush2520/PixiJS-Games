@@ -3,6 +3,8 @@ import { Container, Graphics } from "pixi.js";
 export class AceOfShadowsBoard extends Container {
   private readonly stackBasePositions: Array<{ x: number; y: number }> = [];
   private readonly stacks: Container[] = [];
+  private moveInterval?: number;
+  private currentTargetStack = 1;
 
   async init(): Promise<void> {
     this.createStackPlaceholders();
@@ -65,22 +67,73 @@ export class AceOfShadowsBoard extends Container {
     const colors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181];
     const firstStack = this.stacks[0];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 144; i++) {
       const cardGraphics = new Graphics();
       cardGraphics.rect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
-      cardGraphics.fill(colors[i]);
-      cardGraphics.stroke({ width: 3, color: 0xffffff });
+      cardGraphics.fill(colors[i % colors.length]);
+      cardGraphics.stroke({ width: 1, color: 0xffffff });
 
-      cardGraphics.x = i * 4;
-      cardGraphics.y = i * 4;
+      // Only show top 15 cards for visual effect
+      const visibleIndex = Math.max(0, i - 129);
+      cardGraphics.x = visibleIndex * 2;
+      cardGraphics.y = visibleIndex * 2;
 
       firstStack.addChild(cardGraphics);
     }
   }
 
+  startAnimation(): void {
+    if (this.moveInterval) {
+      return; // Already running
+    }
+    this.moveInterval = setInterval(() => {
+      this.moveCardWithAnimation();
+    }, 1000) as unknown as number;
+  }
+
+  stopAnimation(): void {
+    if (this.moveInterval) {
+      clearInterval(this.moveInterval);
+      this.moveInterval = undefined;
+    }
+  }
+
+  resetCards(): void {
+    this.stopAnimation();
+    this.currentTargetStack = 1;
+
+    // Move all cards back to first stack
+    const firstStack = this.stacks[0];
+    for (let i = 1; i < this.stacks.length; i++) {
+      const stack = this.stacks[i];
+      // Get all cards (skip placeholder at index 0)
+      while (stack.children.length > 1) {
+        const card = stack.children[stack.children.length - 1];
+        stack.removeChild(card);
+        firstStack.addChild(card);
+      }
+    }
+
+    // Re-layout first stack
+    let cardIndex = 0;
+    for (let i = 1; i < firstStack.children.length; i++) {
+      const card = firstStack.children[i];
+      const visibleIndex = Math.max(0, cardIndex - 129);
+      card.x = visibleIndex * 2;
+      card.y = visibleIndex * 2;
+      cardIndex++;
+    }
+  }
+
   moveCardWithAnimation(): void {
     const fromIndex = 0;
-    const toIndex = 1;
+    const toIndex = this.currentTargetStack;
+
+    // Cycle through stacks 1-5
+    this.currentTargetStack++;
+    if (this.currentTargetStack >= this.stacks.length) {
+      this.currentTargetStack = 1;
+    }
 
     if (
       fromIndex < 0 ||
@@ -114,14 +167,15 @@ export class AceOfShadowsBoard extends Container {
 
     // Calculate target position
     const targetStackCardCount = toStack.children.length - 1;
-    const targetX = toStack.x + targetStackCardCount * 4;
-    const targetY = toStack.y + targetStackCardCount * 4;
+    const visibleCardCount = Math.max(0, targetStackCardCount - 129);
+    const targetX = toStack.x + visibleCardCount * 2;
+    const targetY = toStack.y + visibleCardCount * 2;
 
     // Animate
     const startX = card.x;
     const startY = card.y;
     const startTime = Date.now();
-    const duration = 1000;
+    const duration = 2000;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -142,11 +196,17 @@ export class AceOfShadowsBoard extends Container {
 
         // Re-layout target stack
         const cardIndex = toStack.children.length - 2;
-        card.x = cardIndex * 4;
-        card.y = cardIndex * 4;
+        const visibleCardIndex = Math.max(0, cardIndex - 129);
+        card.x = visibleCardIndex * 2;
+        card.y = visibleCardIndex * 2;
       }
     };
 
     requestAnimationFrame(animate);
+  }
+
+  destroy(options?: any): void {
+    this.stopAnimation();
+    super.destroy(options);
   }
 }
