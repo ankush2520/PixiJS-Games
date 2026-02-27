@@ -1,5 +1,6 @@
 import { Text, TextStyle } from "pixi.js";
 import { BaseScene } from "../core/BaseScene";
+import { HomeButton } from "../ui/HomeButton";
 
 export class AceOfShadowsScene extends BaseScene {
   private readonly title = new Text({
@@ -19,6 +20,14 @@ export class AceOfShadowsScene extends BaseScene {
       fill: 0xffffff,
     }),
   });
+  private readonly homeButton: HomeButton;
+
+  constructor(private readonly onHomeSelected: () => void) {
+    super();
+    this.homeButton = new HomeButton(() => {
+      this.onHomeSelected();
+    });
+  }
 
   onEnter(): void {
     this.title.anchor.set(0.5);
@@ -30,10 +39,14 @@ export class AceOfShadowsScene extends BaseScene {
     if (!this.subtitle.parent) {
       this.addChild(this.subtitle);
     }
+    if (!this.homeButton.parent) {
+      this.addChild(this.homeButton);
+    }
   }
 
   resize(width: number, height: number): void {
     this.title.position.set(width / 2, height / 2 - 24);
     this.subtitle.position.set(width / 2, height / 2 + 28);
+    this.homeButton.position.set(16, 16);
   }
 }

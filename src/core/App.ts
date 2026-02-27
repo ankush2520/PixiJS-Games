@@ -42,32 +42,33 @@ export class App {
       );
     });
 
-    sceneManager.show(
-      new MenuScene(
-        () => {
-          sceneManager.show(new AceOfShadowsScene());
-          sceneManager.resize(
-            this.app.renderer.width,
-            this.app.renderer.height,
-          );
-        },
-        () => {
-          sceneManager.show(new MagicWordsScene());
-          sceneManager.resize(
-            this.app.renderer.width,
-            this.app.renderer.height,
-          );
-        },
-        () => {
-          sceneManager.show(new PhoenixFlameScene());
-          sceneManager.resize(
-            this.app.renderer.width,
-            this.app.renderer.height,
-          );
-        },
-      ),
-    );
-    sceneManager.resize(this.app.renderer.width, this.app.renderer.height);
+    const resizeCurrentScene = (): void => {
+      sceneManager.resize(this.app.renderer.width, this.app.renderer.height);
+    };
+
+    const showAceOfShadows = (): void => {
+      sceneManager.show(new AceOfShadowsScene(showMenu));
+      resizeCurrentScene();
+    };
+
+    const showMagicWords = (): void => {
+      sceneManager.show(new MagicWordsScene(showMenu));
+      resizeCurrentScene();
+    };
+
+    const showPhoenixFlame = (): void => {
+      sceneManager.show(new PhoenixFlameScene(showMenu));
+      resizeCurrentScene();
+    };
+
+    const showMenu = (): void => {
+      sceneManager.show(
+        new MenuScene(showAceOfShadows, showMagicWords, showPhoenixFlame),
+      );
+      resizeCurrentScene();
+    };
+
+    showMenu();
 
     // Add global FPS counter last so it renders on top
     new FpsCounter(this.app);
