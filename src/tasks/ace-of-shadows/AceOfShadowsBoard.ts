@@ -1,25 +1,11 @@
-import { Assets, Container, Sprite, Texture } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 
 export class AceOfShadowsBoard extends Container {
-  private _cardTexture?: Texture;
-  private readonly stacksContainer = new Container();
   private readonly stackBasePositions: Array<{ x: number; y: number }> = [];
-  private readonly stackPlaceholders: Sprite[] = [];
-
-  private stacks: Container[] = [];
-
-  constructor() {
-    super();
-    this.addChild(this.stacksContainer);
-  }
+  private readonly stacks: Container[] = [];
 
   async init(): Promise<void> {
-    this._cardTexture = await Assets.load("/assets/card.png");
     this.createStackPlaceholders();
-  }
-
-  get cardTexture(): Texture | undefined {
-    return this._cardTexture;
   }
 
   get stackPositions(): ReadonlyArray<{ x: number; y: number }> {
@@ -31,19 +17,17 @@ export class AceOfShadowsBoard extends Container {
   }
 
   private createStackPlaceholders(): void {
-    if (!this._cardTexture) {
-      return;
-    }
-
     this.stackBasePositions.length = 0;
-    this.stacksContainer.removeChildren();
-    for (const placeholder of this.stackPlaceholders) {
-      placeholder.destroy();
+    for (const stack of this.stacks) {
+      this.removeChild(stack);
+      stack.destroy({ children: true });
     }
-    this.stackPlaceholders.length = 0;
+    this.stacks.length = 0;
 
-    const spacingX = 220;
-    const spacingY = 260;
+    const cardWidth = 140;
+    const cardHeight = 200;
+    const spacingX = 180;
+    const spacingY = 250;
     const columns = 3;
     const rows = 2;
 
@@ -54,16 +38,43 @@ export class AceOfShadowsBoard extends Container {
         const x = (col - (columns - 1) / 2) * spacingX;
         this.stackBasePositions.push({ x, y });
 
-        const stackBase = new Sprite(this._cardTexture);
-        stackBase.anchor.set(0.5);
-        stackBase.width = 240;
-        stackBase.height = 320;
-        stackBase.alpha = 0.25;
-        stackBase.position.set(x, y);
+        const stackContainer = new Container();
+        stackContainer.position.set(x, y);
 
-        this.stackPlaceholders.push(stackBase);
-        this.stacksContainer.addChild(stackBase);
+        // Create placeholder using Graphics - outline only
+        const stackBase = new Graphics();
+        stackBase.rect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
+        stackBase.stroke({ width: 2, color: 0xffffff, alpha: 0.4 });
+
+        stackContainer.addChild(stackBase);
+        this.stacks.push(stackContainer);
+        this.addChild(stackContainer);
       }
+    }
+
+    this.populateFirstStack();
+  }
+
+  private populateFirstStack(): void {
+    if (this.stacks.length === 0) {
+      return;
+    }
+
+    const cardWidth = 140;
+    const cardHeight = 200;
+    const colors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181];
+    const firstStack = this.stacks[0];
+
+    for (let i = 0; i < 5; i++) {
+      const cardGraphics = new Graphics();
+      cardGraphics.rect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
+      cardGraphics.fill(colors[i]);
+      cardGraphics.stroke({ width: 3, color: 0xffffff });
+
+      cardGraphics.x = i * 4;
+      cardGraphics.y = i * 4;
+
+      firstStack.addChild(cardGraphics);
     }
   }
 }
