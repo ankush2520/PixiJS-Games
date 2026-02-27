@@ -38,6 +38,11 @@ export class AceOfShadowsScene extends BaseScene {
     if (!this.board.parent) {
       this.addChild(this.board);
       this.board.init();
+
+      // Move a card after 2 seconds
+      setTimeout(() => {
+        this.board.moveCardWithAnimation();
+      }, 2000);
     }
 
     this.homeButton.position.set(16, 16);

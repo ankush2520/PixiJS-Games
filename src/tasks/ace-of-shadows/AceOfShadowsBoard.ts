@@ -77,4 +77,76 @@ export class AceOfShadowsBoard extends Container {
       firstStack.addChild(cardGraphics);
     }
   }
+
+  moveCardWithAnimation(): void {
+    const fromIndex = 0;
+    const toIndex = 1;
+
+    if (
+      fromIndex < 0 ||
+      fromIndex >= this.stacks.length ||
+      toIndex < 0 ||
+      toIndex >= this.stacks.length
+    ) {
+      return;
+    }
+
+    const fromStack = this.stacks[fromIndex];
+    const toStack = this.stacks[toIndex];
+
+    // Get top card (last child, excluding placeholder at index 0)
+    if (fromStack.children.length <= 1) {
+      return;
+    }
+
+    const card = fromStack.children[fromStack.children.length - 1];
+
+    // Get global position
+    const globalPos = card.getGlobalPosition();
+
+    // Remove from stack and add to board for animation
+    fromStack.removeChild(card);
+    this.addChild(card);
+
+    // Set card to its global position in board coordinates
+    const localPos = this.toLocal(globalPos);
+    card.position.set(localPos.x, localPos.y);
+
+    // Calculate target position
+    const targetStackCardCount = toStack.children.length - 1;
+    const targetX = toStack.x + targetStackCardCount * 4;
+    const targetY = toStack.y + targetStackCardCount * 4;
+
+    // Animate
+    const startX = card.x;
+    const startY = card.y;
+    const startTime = Date.now();
+    const duration = 1000;
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease out cubic
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+      card.x = startX + (targetX - startX) * easeProgress;
+      card.y = startY + (targetY - startY) * easeProgress;
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Animation complete
+        this.removeChild(card);
+        toStack.addChild(card);
+
+        // Re-layout target stack
+        const cardIndex = toStack.children.length - 2;
+        card.x = cardIndex * 4;
+        card.y = cardIndex * 4;
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
 }
