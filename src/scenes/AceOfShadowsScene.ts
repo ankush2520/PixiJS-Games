@@ -1,52 +1,51 @@
 import { Text, TextStyle } from "pixi.js";
 import { BaseScene } from "../core/BaseScene";
 import { HomeButton } from "../ui/HomeButton";
+import { AceOfShadowsBoard } from "../tasks/ace-of-shadows/AceOfShadowsBoard";
 
 export class AceOfShadowsScene extends BaseScene {
   private readonly title = new Text({
     text: "Ace of Shadows",
     style: new TextStyle({
       fontFamily: "Arial",
-      fontSize: 48,
-      fill: 0xffffff,
-    }),
-  });
-
-  private readonly subtitle = new Text({
-    text: "Mini game scene",
-    style: new TextStyle({
-      fontFamily: "Arial",
       fontSize: 24,
       fill: 0xffffff,
     }),
   });
+
   private readonly homeButton: HomeButton;
+  private readonly board: AceOfShadowsBoard;
 
   constructor(private readonly onHomeSelected: () => void) {
     super();
     this.homeButton = new HomeButton(() => {
       this.onHomeSelected();
     });
+    this.board = new AceOfShadowsBoard();
   }
 
   onEnter(): void {
     this.title.anchor.set(0.5);
-    this.subtitle.anchor.set(0.5);
 
     if (!this.title.parent) {
       this.addChild(this.title);
     }
-    if (!this.subtitle.parent) {
-      this.addChild(this.subtitle);
-    }
+
     if (!this.homeButton.parent) {
       this.addChild(this.homeButton);
     }
+
+    if (!this.board.parent) {
+      this.addChild(this.board);
+      this.board.init();
+    }
+
+    this.homeButton.position.set(16, 16);
   }
 
-  resize(width: number, height: number): void {
-    this.title.position.set(width / 2, height / 2 - 24);
-    this.subtitle.position.set(width / 2, height / 2 + 28);
+  resize(_width: number, _height: number): void {
+    this.title.position.set(_width / 2, 30);
     this.homeButton.position.set(16, 16);
+    this.board.resize(_width, _height);
   }
 }
