@@ -1,14 +1,6 @@
-import {
-  Assets,
-  Container,
-  FederatedPointerEvent,
-  FederatedWheelEvent,
-  Graphics,
-  Sprite,
-  Text,
-  Texture,
-} from "pixi.js";
+import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import { RichTextRenderer } from "./RichTextRenderer";
+import { Scrollinghandler } from "./Scrollinghandler";
 
 const MAGIC_WORDS_API_URL =
   "https://private-624120-softgamesassignment.apiary-mock.com/v2/magicwords";
@@ -20,6 +12,7 @@ export class MagicWordsBoard extends Container {
   private readonly messagesContainer: Container;
   private readonly scrollbarTrack: Graphics;
   private readonly scrollbarThumb: Graphics;
+  private readonly scrollinghandler: Scrollinghandler;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private dialogue: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,11 +27,6 @@ export class MagicWordsBoard extends Container {
   private viewportWidth = 500;
   private viewportHeight = 400;
   private contentHeight = 0;
-  private scrollY = 0;
-  private minScrollY = 0;
-  private isDragging = false;
-  private dragStartY = 0;
-  private dragStartScrollY = 0;
   private dialogueRenderVersion = 0;
   private readonly viewportPadding = 12;
   private readonly scrollbarWidth = 6;
@@ -77,9 +65,22 @@ export class MagicWordsBoard extends Container {
     this.messagesContainer.mask = this.viewportMask;
     this.addChild(this.viewportContainer);
 
-    this.setupScrolling();
+    this.scrollinghandler = new Scrollinghandler(
+      this.viewportContainer,
+      this.messagesContainer,
+      this.scrollbarTrack,
+      this.scrollbarThumb,
+      {
+        viewportPadding: this.viewportPadding,
+        scrollbarWidth: this.scrollbarWidth,
+      },
+    );
     this.drawViewport();
-    this.applyScrollPosition();
+    this.scrollinghandler.setViewportSize(
+      this.viewportWidth,
+      this.viewportHeight,
+    );
+    this.scrollinghandler.setContentHeight(this.contentHeight);
   }
 
   async init(): Promise<void> {
@@ -217,38 +218,12 @@ export class MagicWordsBoard extends Container {
     }
 
     this.contentHeight = Math.max(0, nextY - messageGap);
-    this.updateScrollBounds();
-    this.applyScrollPosition();
-  }
-
-  private extractTexture(asset: unknown): Texture | null {
-    if (asset instanceof Texture) {
-      return asset;
-    }
-
-    if (asset && typeof asset === "object" && "texture" in asset) {
-      const texture = (asset as { texture?: unknown }).texture;
-      if (texture instanceof Texture) {
-        return texture;
-      }
-    }
-
-    try {
-      const texture = Texture.from(asset as never);
-      if (texture && texture !== Texture.EMPTY) {
-        return texture;
-      }
-    } catch {
-      // Ignore conversion errors; caller will fallback.
-    }
-
-    return null;
+    this.scrollinghandler.setContentHeight(this.contentHeight);
   }
 
   private getTextureFromUrl(url: string): Texture | null {
     try {
-      const texture = Texture.from(url);
-      return texture === Texture.EMPTY ? null : texture;
+      return Texture.from(url);
     } catch {
       return null;
     }
@@ -260,12 +235,7 @@ export class MagicWordsBoard extends Container {
       return cachedTexture;
     }
 
-    const texturePromise = Assets.load(url)
-      .then((asset) => this.extractTexture(asset))
-      .then((texture) => texture ?? this.getTextureFromUrl(url))
-      .catch(() => this.getTextureFromUrl(url))
-      .catch(() => null);
-
+    const texturePromise = Promise.resolve(this.getTextureFromUrl(url));
     this.avatarTextureCache.set(url, texturePromise);
     return texturePromise;
   }
@@ -332,68 +302,15 @@ export class MagicWordsBoard extends Container {
     this.viewportHeight = nextViewportHeight;
 
     this.drawViewport();
-    this.updateScrollBounds();
-    this.applyScrollPosition();
+    this.scrollinghandler.setViewportSize(
+      this.viewportWidth,
+      this.viewportHeight,
+    );
+    this.scrollinghandler.setContentHeight(this.contentHeight);
 
     if (sizeChanged && this.dialogue.length > 0) {
       void this.renderDialogue();
     }
-  }
-
-  private setupScrolling(): void {
-    this.viewportContainer.eventMode = "static";
-    this.viewportContainer.cursor = "grab";
-
-    this.viewportContainer.on("pointerdown", this.onPointerDown, this);
-    this.viewportContainer.on("pointermove", this.onPointerMove, this);
-    this.viewportContainer.on("pointerup", this.onPointerUp, this);
-    this.viewportContainer.on("pointerupoutside", this.onPointerUp, this);
-    this.viewportContainer.on("pointercancel", this.onPointerUp, this);
-    this.viewportContainer.on("wheel", this.onWheel, this);
-  }
-
-  private onPointerDown(event: FederatedPointerEvent): void {
-    if (this.minScrollY === 0) {
-      return;
-    }
-
-    this.isDragging = true;
-    this.dragStartY = event.global.y;
-    this.dragStartScrollY = this.scrollY;
-    this.viewportContainer.cursor = "grabbing";
-  }
-
-  private onPointerMove(event: FederatedPointerEvent): void {
-    if (!this.isDragging) {
-      return;
-    }
-
-    const deltaY = event.global.y - this.dragStartY;
-    this.setScroll(this.dragStartScrollY + deltaY);
-  }
-
-  private onPointerUp(): void {
-    this.isDragging = false;
-    this.viewportContainer.cursor = this.minScrollY < 0 ? "grab" : "default";
-  }
-
-  private onWheel(event: FederatedWheelEvent): void {
-    if (this.minScrollY === 0) {
-      return;
-    }
-
-    const DOM_DELTA_LINE = 1;
-    const DOM_DELTA_PAGE = 2;
-    let delta = event.deltaY;
-    if (event.deltaMode === DOM_DELTA_LINE) {
-      delta *= 16;
-    } else if (event.deltaMode === DOM_DELTA_PAGE) {
-      delta *= this.viewportHeight * 0.9;
-    }
-
-    this.setScroll(this.scrollY - delta);
-    event.preventDefault();
-    event.stopPropagation();
   }
 
   private drawViewport(): void {
@@ -421,79 +338,5 @@ export class MagicWordsBoard extends Container {
       cornerRadius,
     );
     this.viewportMask.fill(0xffffff);
-
-    this.updateScrollbar();
-  }
-
-  private updateScrollBounds(): void {
-    const visibleHeight = this.viewportHeight - this.viewportPadding * 2;
-    this.minScrollY = Math.min(0, visibleHeight - this.contentHeight);
-    this.setScroll(this.scrollY);
-    if (!this.isDragging) {
-      this.viewportContainer.cursor = this.minScrollY < 0 ? "grab" : "default";
-    }
-  }
-
-  private setScroll(nextScrollY: number): void {
-    const clampedScrollY = Math.max(this.minScrollY, Math.min(0, nextScrollY));
-    this.scrollY = clampedScrollY;
-    this.applyScrollPosition();
-    this.updateScrollbar();
-  }
-
-  private applyScrollPosition(): void {
-    this.messagesContainer.position.set(
-      -this.viewportWidth / 2 + this.viewportPadding,
-      -this.viewportHeight / 2 + this.viewportPadding + this.scrollY,
-    );
-  }
-
-  private updateScrollbar(): void {
-    const trackX =
-      this.viewportWidth / 2 - this.viewportPadding - this.scrollbarWidth;
-    const trackY = -this.viewportHeight / 2 + this.viewportPadding;
-    const trackHeight = this.viewportHeight - this.viewportPadding * 2;
-
-    this.scrollbarTrack.clear();
-    this.scrollbarTrack.roundRect(
-      trackX,
-      trackY,
-      this.scrollbarWidth,
-      trackHeight,
-      this.scrollbarWidth / 2,
-    );
-    this.scrollbarTrack.fill({ color: 0xffffff, alpha: 0.15 });
-
-    this.scrollbarThumb.clear();
-    if (this.minScrollY === 0 || this.contentHeight <= 0) {
-      return;
-    }
-
-    const visibleHeight = this.viewportHeight - this.viewportPadding * 2;
-    const contentScrollableHeight = this.contentHeight - visibleHeight;
-    if (contentScrollableHeight <= 0) {
-      return;
-    }
-
-    const minThumbHeight = 34;
-    const thumbHeight = Math.max(
-      minThumbHeight,
-      trackHeight * (visibleHeight / this.contentHeight),
-    );
-    const thumbTravel = Math.max(0, trackHeight - thumbHeight);
-    const scrollProgress = Math.max(
-      0,
-      Math.min(1, -this.scrollY / contentScrollableHeight),
-    );
-    const thumbY = trackY + thumbTravel * scrollProgress;
-
-    this.scrollbarThumb.roundRect(
-      trackX,
-      thumbY,
-      this.scrollbarWidth,
-      thumbHeight,
-      this.scrollbarWidth / 2,
-    );
-    this.scrollbarThumb.fill({ color: 0xffffff, alpha: 0.7 });
   }
 }

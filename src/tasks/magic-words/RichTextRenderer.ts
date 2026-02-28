@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, Text, Texture } from "pixi.js";
+import { Container, Sprite, Text, Texture } from "pixi.js";
 
 type RichTextToken =
   | { type: "text"; value: string }
@@ -59,49 +59,20 @@ export class RichTextRenderer extends Container {
     return tokens;
   }
 
-  private extractTexture(asset: unknown): Texture | null {
-    if (asset instanceof Texture) {
-      return asset;
-    }
-
-    if (asset && typeof asset === "object" && "texture" in asset) {
-      const texture = (asset as { texture?: unknown }).texture;
-      if (texture instanceof Texture) {
-        return texture;
-      }
-    }
-
-    try {
-      const texture = Texture.from(asset as never);
-      if (texture && texture !== Texture.EMPTY) {
-        return texture;
-      }
-    } catch {
-      // Ignore conversion errors; caller will fallback.
-    }
-
-    return null;
-  }
-
   private getEmojiTexture(url: string): Promise<Texture | null> {
     const cachedTexture = RichTextRenderer.emojiTextureCache.get(url);
     if (cachedTexture) {
       return cachedTexture;
     }
 
-    const texturePromise = Assets.load(url)
-      .then((asset) => this.extractTexture(asset))
-      .then((texture) => texture ?? this.getTextureFromUrl(url))
-      .catch(() => this.getTextureFromUrl(url))
-      .catch(() => null);
+    const texturePromise = Promise.resolve(this.getTextureFromUrl(url));
     RichTextRenderer.emojiTextureCache.set(url, texturePromise);
     return texturePromise;
   }
 
   private getTextureFromUrl(url: string): Texture | null {
     try {
-      const texture = Texture.from(url);
-      return texture === Texture.EMPTY ? null : texture;
+      return Texture.from(url);
     } catch {
       return null;
     }
