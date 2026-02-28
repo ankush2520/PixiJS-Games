@@ -25,9 +25,15 @@ export class MagicWordsScene extends BaseScene {
   }
 
   resize(width: number, height: number): void {
-    // Keep board centered in the scene
-    this.board.position.set(width / 2, height / 2);
-
     this.homeButton.position.set(16, 16);
+
+    const homeButtonHeight = this.homeButton.height;
+    const verticalGap = homeButtonHeight;
+    const topPadding = this.homeButton.y + homeButtonHeight + verticalGap;
+    const bottomPadding = verticalGap;
+    const availableHeight = Math.max(1, height - topPadding - bottomPadding);
+
+    this.board.position.set(width / 2, topPadding + availableHeight / 2);
+    this.board.resize(width, height, topPadding, bottomPadding);
   }
 }

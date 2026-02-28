@@ -21,6 +21,7 @@ export class App {
       antialias: true,
       background: "#1099bb",
     });
+    this.app.renderer.events.features.wheel = true;
 
     const sceneManager = new SceneManager(this.app);
     this.sceneManager = sceneManager;
