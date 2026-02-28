@@ -221,23 +221,31 @@ export class MagicWordsBoard extends Container {
     this.scrollinghandler.setContentHeight(this.contentHeight);
   }
 
-  private getTextureFromUrl(url: string): Texture | null {
-    try {
-      return Texture.from(url);
-    } catch {
-      return null;
-    }
-  }
-
   private getAvatarTexture(url: string): Promise<Texture | null> {
     const cachedTexture = this.avatarTextureCache.get(url);
     if (cachedTexture) {
       return cachedTexture;
     }
 
-    const texturePromise = Promise.resolve(this.getTextureFromUrl(url));
+    const texturePromise = this.loadTextureFromUrl(url);
     this.avatarTextureCache.set(url, texturePromise);
     return texturePromise;
+  }
+
+  private loadTextureFromUrl(url: string): Promise<Texture | null> {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = () => {
+        try {
+          resolve(Texture.from(image));
+        } catch {
+          resolve(null);
+        }
+      };
+      image.onerror = () => resolve(null);
+      image.src = url;
+    });
   }
 
   private async createAvatarNode(

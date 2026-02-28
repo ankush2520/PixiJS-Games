@@ -65,17 +65,25 @@ export class RichTextRenderer extends Container {
       return cachedTexture;
     }
 
-    const texturePromise = Promise.resolve(this.getTextureFromUrl(url));
+    const texturePromise = this.loadTextureFromUrl(url);
     RichTextRenderer.emojiTextureCache.set(url, texturePromise);
     return texturePromise;
   }
 
-  private getTextureFromUrl(url: string): Texture | null {
-    try {
-      return Texture.from(url);
-    } catch {
-      return null;
-    }
+  private loadTextureFromUrl(url: string): Promise<Texture | null> {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = () => {
+        try {
+          resolve(Texture.from(image));
+        } catch {
+          resolve(null);
+        }
+      };
+      image.onerror = () => resolve(null);
+      image.src = url;
+    });
   }
 
   private resolveEmojiUrl(name: string): string | null {
