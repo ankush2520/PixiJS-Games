@@ -1,8 +1,12 @@
 import {
+  Assets,
   Container,
   FederatedPointerEvent,
   FederatedWheelEvent,
   Graphics,
+  Sprite,
+  Text,
+  Texture,
 } from "pixi.js";
 import { RichTextRenderer } from "./RichTextRenderer";
 
@@ -39,6 +43,22 @@ export class MagicWordsBoard extends Container {
   private readonly viewportPadding = 12;
   private readonly scrollbarWidth = 6;
   private readonly scrollbarGap = 8;
+  private readonly avatarTextureCache = new Map<
+    string,
+    Promise<Texture | null>
+  >();
+  private readonly senderNameStyle = {
+    fill: 0xe2e8f0,
+    fontFamily: "Arial",
+    fontSize: 14,
+    fontWeight: "600" as const,
+  };
+  private readonly fallbackAvatarLabelStyle = {
+    fill: 0xffffff,
+    fontFamily: "Arial",
+    fontSize: 16,
+    fontWeight: "700" as const,
+  };
 
   constructor() {
     super();
@@ -75,13 +95,22 @@ export class MagicWordsBoard extends Container {
     this.emojies = data.emojies;
     this.avatars = data.avatars;
 
+    this.emojiUrlByName.clear();
+    this.avatarByName.clear();
+
     for (const item of this.emojies) {
-      this.emojiUrlByName.set(item.name, item.url);
+      this.emojiUrlByName.set(
+        String(item.name).trim().toLowerCase(),
+        String(item.url),
+      );
     }
 
     for (const item of this.avatars) {
-      this.avatarByName.set(item.name, {
-        url: item.url,
+      this.avatarByName.set(String(item.name), {
+        url: String(item.url).replace(
+          "https://api.dicebear.com:81/",
+          "https://api.dicebear.com/",
+        ),
         position: item.position,
       });
     }
@@ -104,23 +133,46 @@ export class MagicWordsBoard extends Container {
     const bubblePaddingX = 12;
     const bubblePaddingY = 8;
     const messageGap = 12;
+    const avatarSize = 42;
+    const avatarGap = 10;
+    const senderNameGap = 4;
     const scrollbarReserve = this.scrollbarWidth + this.scrollbarGap;
-    const maxMessageWidth = Math.max(
+    const contentWidth = Math.max(
+      180,
+      this.viewportWidth - viewportPadding * 2 - scrollbarReserve,
+    );
+    const maxTextWidth = Math.max(
       120,
-      this.viewportWidth -
-        viewportPadding * 2 -
-        bubblePaddingX * 2 -
-        scrollbarReserve,
+      contentWidth - avatarSize - avatarGap - bubblePaddingX * 2,
     );
 
     let nextY = 0;
 
     for (let index = 0; index < this.dialogue.length; index++) {
-      const item = this.dialogue[index];
-      const messageContainer = new Container();
+      const item = this.dialogue[index] as { name?: string; text?: string };
+      const speakerName = item.name ?? "Unknown";
+      const messageText = item.text ?? "";
+      const avatarData = this.avatarByName.get(speakerName);
+      const isLeft = avatarData
+        ? avatarData.position === "left"
+        : speakerName === "Sheldon";
+      const rowContainer = new Container();
+      const senderNameLabel = new Text({
+        text: speakerName,
+        style: this.senderNameStyle,
+      });
+      const avatarNode = await this.createAvatarNode(
+        speakerName,
+        avatarData?.url,
+        avatarSize,
+      );
+      if (currentRenderVersion !== this.dialogueRenderVersion) {
+        return;
+      }
+
       const renderer = new RichTextRenderer(
-        item.text ?? "",
-        Math.min(500, maxMessageWidth),
+        messageText,
+        Math.min(500, maxTextWidth),
         this.emojiUrlByName,
       );
       await renderer.render();
@@ -130,29 +182,128 @@ export class MagicWordsBoard extends Container {
 
       const bubble = new Graphics();
       const bubbleWidth = Math.min(
-        Math.min(500, maxMessageWidth) + bubblePaddingX * 2,
+        Math.min(500, maxTextWidth) + bubblePaddingX * 2,
         Math.max(100, renderer.width + bubblePaddingX * 2),
       );
       const bubbleHeight = Math.max(36, renderer.height + bubblePaddingY * 2);
-      const bubbleColor = index % 2 === 0 ? 0x0a2b45 : 0x134264;
+      const bubbleColor = isLeft ? 0x0a2b45 : 0x174267;
+      const nameBlockHeight = senderNameLabel.height + senderNameGap;
+      const contentX = isLeft
+        ? avatarSize + avatarGap
+        : contentWidth - avatarSize - avatarGap - bubbleWidth;
+      const avatarX = isLeft ? 0 : contentWidth - avatarSize;
 
       bubble.roundRect(0, 0, bubbleWidth, bubbleHeight, 14);
       bubble.fill({ color: bubbleColor, alpha: 0.9 });
       bubble.stroke({ width: 1, color: 0xffffff, alpha: 0.15 });
 
       renderer.position.set(bubblePaddingX, bubblePaddingY);
+      senderNameLabel.position.set(contentX, 0);
+      avatarNode.position.set(avatarX, 0);
+
+      const messageContainer = new Container();
+      messageContainer.position.set(contentX, nameBlockHeight);
       messageContainer.addChild(bubble);
       messageContainer.addChild(renderer);
-      messageContainer.y = nextY;
 
-      nextY += bubbleHeight + messageGap;
+      rowContainer.addChild(avatarNode);
+      rowContainer.addChild(senderNameLabel);
+      rowContainer.addChild(messageContainer);
+      rowContainer.y = nextY;
+      this.messagesContainer.addChild(rowContainer);
 
-      this.messagesContainer.addChild(messageContainer);
+      const rowHeight = Math.max(avatarSize, nameBlockHeight + bubbleHeight);
+      nextY += rowHeight + messageGap;
     }
 
     this.contentHeight = Math.max(0, nextY - messageGap);
     this.updateScrollBounds();
     this.applyScrollPosition();
+  }
+
+  private extractTexture(asset: unknown): Texture | null {
+    if (asset instanceof Texture) {
+      return asset;
+    }
+
+    if (asset && typeof asset === "object" && "texture" in asset) {
+      const texture = (asset as { texture?: unknown }).texture;
+      if (texture instanceof Texture) {
+        return texture;
+      }
+    }
+
+    try {
+      const texture = Texture.from(asset as never);
+      if (texture && texture !== Texture.EMPTY) {
+        return texture;
+      }
+    } catch {
+      // Ignore conversion errors; caller will fallback.
+    }
+
+    return null;
+  }
+
+  private getTextureFromUrl(url: string): Texture | null {
+    try {
+      const texture = Texture.from(url);
+      return texture === Texture.EMPTY ? null : texture;
+    } catch {
+      return null;
+    }
+  }
+
+  private getAvatarTexture(url: string): Promise<Texture | null> {
+    const cachedTexture = this.avatarTextureCache.get(url);
+    if (cachedTexture) {
+      return cachedTexture;
+    }
+
+    const texturePromise = Assets.load(url)
+      .then((asset) => this.extractTexture(asset))
+      .then((texture) => texture ?? this.getTextureFromUrl(url))
+      .catch(() => this.getTextureFromUrl(url))
+      .catch(() => null);
+
+    this.avatarTextureCache.set(url, texturePromise);
+    return texturePromise;
+  }
+
+  private async createAvatarNode(
+    speakerName: string,
+    avatarUrl: string | undefined,
+    avatarSize: number,
+  ): Promise<Container> {
+    const avatarContainer = new Container();
+    const frame = new Graphics();
+    frame.circle(avatarSize / 2, avatarSize / 2, avatarSize / 2);
+    frame.fill({ color: 0x0f2d44, alpha: 0.95 });
+    frame.stroke({ width: 1.5, color: 0xffffff, alpha: 0.35 });
+    avatarContainer.addChild(frame);
+
+    if (avatarUrl) {
+      const texture = await this.getAvatarTexture(avatarUrl);
+      if (texture) {
+        const avatarSprite = new Sprite(texture);
+        const inset = 2;
+        avatarSprite.width = avatarSize - inset * 2;
+        avatarSprite.height = avatarSize - inset * 2;
+        avatarSprite.position.set(inset, inset);
+        avatarContainer.addChild(avatarSprite);
+        return avatarContainer;
+      }
+    }
+
+    const fallbackLabel = new Text({
+      text: speakerName.charAt(0).toUpperCase(),
+      style: this.fallbackAvatarLabelStyle,
+    });
+    fallbackLabel.anchor.set(0.5);
+    fallbackLabel.position.set(avatarSize / 2, avatarSize / 2);
+    avatarContainer.addChild(fallbackLabel);
+
+    return avatarContainer;
   }
 
   resize(

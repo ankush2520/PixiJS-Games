@@ -5,13 +5,14 @@ type RichTextToken =
   | { type: "emoji"; name: string };
 
 export class RichTextRenderer extends Container {
-  private readonly text: string;
-  private readonly maxWidth: number;
-  private readonly emojiUrlByName: Map<string, string>;
-  private readonly emojiTextureCache = new Map<
+  private static readonly FALLBACK_EMOJI_NAME = "neutral";
+  private static readonly emojiTextureCache = new Map<
     string,
     Promise<Texture | null>
   >();
+  private readonly text: string;
+  private readonly maxWidth: number;
+  private readonly emojiUrlByName: Map<string, string>;
   private renderVersion = 0;
   private readonly textStyle = {
     fill: 0xffffff,
@@ -33,20 +34,26 @@ export class RichTextRenderer extends Container {
 
   private parseText(): RichTextToken[] {
     const tokens: RichTextToken[] = [];
-    const parts = this.text.split(/(\{[^{}]+\})/g);
+    const emojiPattern = /\{([^{}]+)\}/g;
+    let currentIndex = 0;
+    let match = emojiPattern.exec(this.text);
 
-    for (const part of parts) {
-      if (!part) {
-        continue;
+    while (match) {
+      const matchIndex = match.index;
+      if (matchIndex > currentIndex) {
+        tokens.push({
+          type: "text",
+          value: this.text.slice(currentIndex, matchIndex),
+        });
       }
 
-      const emojiMatch = part.match(/^\{([^{}]+)\}$/);
-      if (emojiMatch) {
-        tokens.push({ type: "emoji", name: emojiMatch[1] });
-        continue;
-      }
+      tokens.push({ type: "emoji", name: match[1] });
+      currentIndex = emojiPattern.lastIndex;
+      match = emojiPattern.exec(this.text);
+    }
 
-      tokens.push({ type: "text", value: part });
+    if (currentIndex < this.text.length) {
+      tokens.push({ type: "text", value: this.text.slice(currentIndex) });
     }
 
     return tokens;
@@ -64,20 +71,52 @@ export class RichTextRenderer extends Container {
       }
     }
 
+    try {
+      const texture = Texture.from(asset as never);
+      if (texture && texture !== Texture.EMPTY) {
+        return texture;
+      }
+    } catch {
+      // Ignore conversion errors; caller will fallback.
+    }
+
     return null;
   }
 
   private getEmojiTexture(url: string): Promise<Texture | null> {
-    const cachedTexture = this.emojiTextureCache.get(url);
+    const cachedTexture = RichTextRenderer.emojiTextureCache.get(url);
     if (cachedTexture) {
       return cachedTexture;
     }
 
     const texturePromise = Assets.load(url)
       .then((asset) => this.extractTexture(asset))
+      .then((texture) => texture ?? this.getTextureFromUrl(url))
+      .catch(() => this.getTextureFromUrl(url))
       .catch(() => null);
-    this.emojiTextureCache.set(url, texturePromise);
+    RichTextRenderer.emojiTextureCache.set(url, texturePromise);
     return texturePromise;
+  }
+
+  private getTextureFromUrl(url: string): Texture | null {
+    try {
+      const texture = Texture.from(url);
+      return texture === Texture.EMPTY ? null : texture;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveEmojiUrl(name: string): string | null {
+    const normalizedName = name.trim().toLowerCase();
+    const directUrl = this.emojiUrlByName.get(normalizedName);
+    if (directUrl) {
+      return directUrl;
+    }
+
+    return (
+      this.emojiUrlByName.get(RichTextRenderer.FALLBACK_EMOJI_NAME) ?? null
+    );
   }
 
   async render(): Promise<void> {
@@ -116,7 +155,7 @@ export class RichTextRenderer extends Container {
         continue;
       }
 
-      const emojiUrl = this.emojiUrlByName.get(token.name);
+      const emojiUrl = this.resolveEmojiUrl(token.name);
       if (!emojiUrl) {
         placeText(`{${token.name}}`);
         continue;
