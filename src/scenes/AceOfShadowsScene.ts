@@ -35,7 +35,6 @@ export class AceOfShadowsScene extends BaseScene {
 
     if (!this.board.parent) {
       this.addChild(this.board);
-      this.board.init();
       this.uiManager.setBoard(this.board);
     }
 

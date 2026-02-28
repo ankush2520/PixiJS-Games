@@ -15,10 +15,6 @@ export class AceOfShadowsBoard extends Container {
     return this.movedCards;
   }
 
-  async init(): Promise<void> {
-    // Layout will be created on first resize call
-  }
-
   get stackPositions(): ReadonlyArray<{ x: number; y: number }> {
     return this.stackBasePositions;
   }
