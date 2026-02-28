@@ -115,13 +115,6 @@ export class MagicWordsBoard extends Container {
         position: item.position,
       });
     }
-
-    console.log(
-      "lookup sizes:",
-      this.emojiUrlByName.size,
-      this.avatarByName.size,
-    );
-    console.log(this.dialogue);
   }
 
   async renderDialogue(): Promise<void> {
