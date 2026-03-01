@@ -103,11 +103,6 @@ export class AceOfShadowUIManager extends Container {
   }
 
   resize(width: number, height: number): void {
-    // Counter - centered at top
-    this.counterDisplay.anchor.set(0.5);
-    this.counterDisplay.style.fontSize = 22;
-    this.counterDisplay.position.set(width / 2, 55);
-
     // Calculate grid layout parameters
     const isPortrait = width < height;
     const topPadding = 60;
@@ -117,10 +112,17 @@ export class AceOfShadowUIManager extends Container {
 
     const spacingY = 180;
     const cardHeight = 140;
-    const rows = isPortrait ? 3 : 2; // Portrait: 3 rows, Landscape: 2 rows
-    const lastRowOffset = ((rows - 1) / 2) * spacingY;
-    const cardHalfHeight = cardHeight / 2;
-    const gridBottomY = boardCenterY + lastRowOffset + cardHalfHeight;
+    const rows = isPortrait ? 3 : 2;
+    const firstRowOffset = ((rows - 1) / 2) * spacingY;
+    const topCardY = boardCenterY - firstRowOffset - cardHeight / 2;
+
+    // Counter - vertically centered between top screen edge and top card
+    this.counterDisplay.anchor.set(0.5);
+    this.counterDisplay.style.fontSize = 22;
+    this.counterDisplay.position.set(width / 2, topCardY / 2);
+
+    const lastRowOffset = firstRowOffset;
+    const gridBottomY = boardCenterY + lastRowOffset + cardHeight / 2;
 
     // Buttons - positioned 1.5 * buttonSize below grid (desktop) or 0.75 * buttonSize (mobile)
     const buttonSize = 45;
