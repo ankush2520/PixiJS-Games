@@ -1,153 +1,343 @@
-import { Container, Particle, ParticleContainer, Texture } from "pixi.js"; // Import PIXI types needed for board and particle rendering.
-import { FlameParticle } from "./FlameParticle"; // Import per-particle behavior class.
+import { Container, Particle, ParticleContainer, Texture } from "pixi.js"; // Import PIXI types needed for layered particle rendering.
+import { FlameParticle } from "./FlameParticle"; // Import primary fire particle behavior.
+import { SmokeParticle } from "./SmokeParticle"; // Import secondary smoke particle behavior.
 
 export class PhoenixFlameBoard extends Container {
-  // Define a board that manages pooled flame particles.
-  private readonly particles: FlameParticle[] = []; // Track all allocated particles.
-  private readonly maxParticles = 10; // Limit the number of live/pooled particles.
-  private readonly flameScale = 2.4; // Set the global flame size multiplier.
-  private spawnX = 0; // Store emitter X position.
-  private spawnY = 0; // Store emitter Y position.
-  private emitterTime = 0; // Track elapsed emitter time for sway animation.
-  private readonly activeParticles: FlameParticle[] = []; // Store particles currently animating.
-  private readonly pooledParticles: FlameParticle[] = []; // Store reusable inactive particles.
-  private spawnAccumulator = 0; // Accumulate spawn budget across frames.
-  private readonly spawnPerSecond = 18; // Control emission rate per second.
-  private readonly particleContainer: ParticleContainer<Particle>; // Hold particle sprites in an optimized PIXI container.
-  private flameTexture: Texture | null = null; // Cache generated flame texture.
+  // Flame layer state.
+  private readonly flameParticles: FlameParticle[] = []; // Track all allocated flame particles.
+  private readonly activeFlames: FlameParticle[] = []; // Track currently active flame particles.
+  private readonly pooledFlames: FlameParticle[] = []; // Track reusable flame particles.
+
+  // Smoke layer state.
+  private readonly smokeParticles: SmokeParticle[] = []; // Track all allocated smoke particles.
+  private readonly activeSmoke: SmokeParticle[] = []; // Track currently active smoke particles.
+  private readonly pooledSmoke: SmokeParticle[] = []; // Track reusable smoke particles.
+
+  // Capacity and scale controls.
+  private readonly maxFlameParticles = 66; // Limit total flame particle instances.
+  private readonly maxSmokeParticles = 42; // Limit total smoke particle instances.
+  private readonly flameScale = 3.825; // Set flame sprite scale multiplier (1.5x).
+  private readonly smokeScale = 3.6; // Set smoke sprite scale multiplier (1.5x).
+
+  // Emitter position and timing.
+  private spawnX = 0; // Store emitter x coordinate.
+  private spawnY = 0; // Store emitter y coordinate.
+  private emitterTime = 0; // Track elapsed emitter time for oscillation.
+
+  // Spawn accumulation controls.
+  private flameSpawnAccumulator = 0; // Track frame-accumulated flame spawn budget.
+  private smokeSpawnAccumulator = 0; // Track frame-accumulated smoke spawn budget.
+  private readonly flameSpawnPerSecond = 52; // Base emission rate for flames.
+  private readonly smokeSpawnPerSecond = 8; // Base emission rate for smoke.
+
+  // Render containers.
+  private readonly smokeContainer: ParticleContainer<Particle>; // Container for smoke particles.
+  private readonly flameContainer: ParticleContainer<Particle>; // Container for flame particles.
+
+  // Cached textures.
+  private flameTexture: Texture | null = null; // Procedural flame texture cache.
+  private smokeTexture: Texture | null = null; // Procedural smoke texture cache.
 
   constructor() {
-    // Initialize board and its particle container.
-    super(); // Call base PIXI container constructor.
-    this.particleContainer = new ParticleContainer({
-      // Create high-performance particle container.
+    super();
+
+    this.smokeContainer = new ParticleContainer({
       dynamicProperties: {
-        // Enable per-frame updates for selected properties.
-        position: true, // Allow particle position updates.
-        rotation: true, // Allow particle rotation updates.
-        vertex: true, // Allow scale/geometry updates.
-        color: true, // Allow tint/alpha updates.
-      }, // End dynamic property flags.
-    }); // Finish particle container creation.
-    this.particleContainer.blendMode = "add"; // Use additive blending for bright flame glow.
-    this.addChild(this.particleContainer); // Attach particle container to scene graph.
-  } // End constructor.
+        position: true,
+        rotation: true,
+        vertex: true,
+        color: true,
+      },
+    });
+    this.smokeContainer.blendMode = "normal";
+
+    this.flameContainer = new ParticleContainer({
+      dynamicProperties: {
+        position: true,
+        rotation: true,
+        vertex: true,
+        color: true,
+      },
+    });
+    this.flameContainer.blendMode = "add";
+
+    this.addChild(this.smokeContainer, this.flameContainer); // Render smoke first, fire on top.
+  }
 
   init(): void {
-    // Prepare texture, pool, and initial particle objects.
     if (!this.flameTexture) {
-      // Lazily generate texture once.
-      this.flameTexture = this.createFlameTexture(); // Create and cache procedural flame texture.
-    } // End lazy texture block.
+      this.flameTexture = this.createFlameTexture();
+    }
+    if (!this.smokeTexture) {
+      this.smokeTexture = this.createSmokeTexture();
+    }
 
-    this.activeParticles.length = 0; // Clear active list.
-    this.pooledParticles.length = 0; // Clear pool list.
-    this.particles.length = 0; // Clear all-particles list.
-    this.spawnAccumulator = 0; // Reset spawn accumulator.
-    this.emitterTime = 0; // Reset emitter clock.
+    this.activeFlames.length = 0;
+    this.pooledFlames.length = 0;
+    this.flameParticles.length = 0;
+    this.activeSmoke.length = 0;
+    this.pooledSmoke.length = 0;
+    this.smokeParticles.length = 0;
+    this.flameSpawnAccumulator = 0;
+    this.smokeSpawnAccumulator = 0;
+    this.emitterTime = 0;
 
-    for (const child of [...this.particleContainer.particleChildren]) {
-      // Iterate current particle children safely via shallow copy.
-      this.particleContainer.removeParticle(child); // Remove existing particle from container.
-    } // End existing-child cleanup.
+    for (const child of [...this.flameContainer.particleChildren]) {
+      this.flameContainer.removeParticle(child);
+    }
+    for (const child of [...this.smokeContainer.particleChildren]) {
+      this.smokeContainer.removeParticle(child);
+    }
 
-    for (let i = 0; i < this.maxParticles; i++) {
-      // Pre-allocate pool up to configured maximum.
-      const p = new FlameParticle( // Create one flame particle instance.
-        this.flameTexture ?? Texture.WHITE, // Provide cached texture with white fallback.
-        this.flameScale, // Provide global flame size multiplier.
-      ); // Finish particle construction.
-      p.deactivate(); // Ensure particle starts hidden.
-      this.particles.push(p); // Track in full particle list.
-      this.pooledParticles.push(p); // Add to reusable particle pool.
-      this.particleContainer.addParticle(p.view); // Add particle sprite to render container.
-    } // End pool creation loop.
+    for (let i = 0; i < this.maxFlameParticles; i++) {
+      const flame = new FlameParticle(
+        this.flameTexture ?? Texture.WHITE,
+        this.flameScale,
+      );
+      flame.deactivate();
+      this.flameParticles.push(flame);
+      this.pooledFlames.push(flame);
+      this.flameContainer.addParticle(flame.view);
+    }
 
-    this.particleContainer.update(); // Sync container internals after particle list changes.
-  } // End init.
+    for (let i = 0; i < this.maxSmokeParticles; i++) {
+      const smoke = new SmokeParticle(
+        this.smokeTexture ?? Texture.WHITE,
+        this.smokeScale,
+      );
+      smoke.deactivate();
+      this.smokeParticles.push(smoke);
+      this.pooledSmoke.push(smoke);
+      this.smokeContainer.addParticle(smoke.view);
+    }
+
+    this.flameContainer.update();
+    this.smokeContainer.update();
+  }
 
   update(delta: number): void {
-    // Advance emitter and active particles each frame.
-    const deltaSeconds = delta / 60; // Convert ticker delta to seconds approximation.
-    this.emitterTime += deltaSeconds; // Increment emitter clock.
-    this.spawnAccumulator += deltaSeconds * this.spawnPerSecond; // Accumulate spawn budget from elapsed time.
+    const deltaSeconds = delta / 60;
+    this.emitterTime += deltaSeconds;
 
-    while (this.spawnAccumulator >= 1 && this.pooledParticles.length > 0) {
-      // Spawn while enough budget and pooled particles exist.
-      this.spawnAccumulator -= 1; // Consume one spawn unit.
-      const particle = this.pooledParticles.pop(); // Take a particle from the pool.
-      if (!particle) {
-        // Guard against unexpected undefined.
-        break; // Exit loop if no particle is available.
-      } // End null guard.
+    // Combine slow breathing, fast flutter, and random bursts for non-uniform flame intensity.
+    const breath = 0.74 + 0.34 * (0.5 + 0.5 * Math.sin(this.emitterTime * 2.7));
+    const flutter =
+      0.88 + 0.18 * (0.5 + 0.5 * Math.sin(this.emitterTime * 9.3));
+    const burst = Math.random() < deltaSeconds * 0.9 ? 1.25 : 1;
+    const intensity = breath * flutter * burst;
 
-      const sway = Math.sin(this.emitterTime * 1.35) * 12; // Compute emitter sway motion.
-      const xJitter = (Math.random() - 0.5) * 56; // Add random horizontal spread.
-      const yJitter = -Math.random() * 8; // Add slight upward spawn jitter.
-      particle.reset(this.spawnX + sway + xJitter, this.spawnY + yJitter); // Reinitialize particle at computed spawn point.
-      this.activeParticles.push(particle); // Move particle into active list.
-    } // End spawn loop.
+    this.flameSpawnAccumulator +=
+      deltaSeconds * this.flameSpawnPerSecond * intensity;
+    this.smokeSpawnAccumulator +=
+      deltaSeconds *
+      this.smokeSpawnPerSecond *
+      (0.72 + 0.34 * breath) *
+      (0.95 + 0.08 * Math.random());
 
-    for (let i = this.activeParticles.length - 1; i >= 0; i--) {
-      // Iterate active particles backward for safe removal.
-      const particle = this.activeParticles[i]; // Read current active particle.
-      if (!particle.update(deltaSeconds)) {
-        // Update particle and skip if still alive.
-        continue; // Keep active particle in list.
-      } // End still-alive branch.
-
-      particle.deactivate(); // Hide particle when lifetime ends.
-      this.activeParticles.splice(i, 1); // Remove particle from active list.
-      this.pooledParticles.push(particle); // Return particle to reusable pool.
-    } // End active update loop.
-  } // End update.
+    this.spawnFlames(intensity);
+    this.spawnSmoke(intensity);
+    this.updateFlames(deltaSeconds);
+    this.updateSmoke(deltaSeconds);
+  }
 
   resize(width: number, height: number): void {
-    // Reposition emitter when viewport changes.
-    this.spawnX = width * 0.5; // Place emitter at horizontal center.
-    this.spawnY = height * 0.5; // Place emitter at vertical center.
-  } // End resize.
+    this.spawnX = width * 0.5;
+    this.spawnY = height * 0.84; // Keep the fire base near the bottom of the scene.
+  }
 
   destroy(options?: boolean): void {
-    // Cleanup internal arrays before container destroy.
-    this.activeParticles.length = 0; // Clear active particles.
-    this.pooledParticles.length = 0; // Clear pooled particles.
-    this.particles.length = 0; // Clear master particle list.
-    super.destroy(options); // Forward destroy call to parent class.
-  } // End destroy.
+    this.activeFlames.length = 0;
+    this.pooledFlames.length = 0;
+    this.flameParticles.length = 0;
+    this.activeSmoke.length = 0;
+    this.pooledSmoke.length = 0;
+    this.smokeParticles.length = 0;
+    super.destroy(options);
+  }
+
+  private spawnFlames(intensity: number): void {
+    while (this.flameSpawnAccumulator >= 1 && this.pooledFlames.length > 0) {
+      this.flameSpawnAccumulator -= 1;
+      const flame = this.pooledFlames.pop();
+      if (!flame) {
+        break;
+      }
+
+      // Torus-like spawn around base, matching Pixi emitter flame examples.
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 1.5 + Math.random() * (7 + intensity * 9);
+      const ringX = Math.cos(angle) * radius;
+      const ringY = -Math.abs(Math.sin(angle) * radius * 0.42); // Bias flame spawn above the base.
+      const sway =
+        Math.sin(this.emitterTime * 1.25) * (10 + intensity * 9) +
+        Math.sin(this.emitterTime * 4.6) * 4;
+      const yJitter = Math.random() * 12 - 10; // Favor upward jitter from the base.
+
+      flame.reset(this.spawnX + sway + ringX, this.spawnY + ringY + yJitter);
+      this.activeFlames.push(flame);
+    }
+  }
+
+  private spawnSmoke(intensity: number): void {
+    while (this.smokeSpawnAccumulator >= 1 && this.pooledSmoke.length > 0) {
+      this.smokeSpawnAccumulator -= 1;
+
+      // Skip some spawn slots to create irregular puffs.
+      if (Math.random() < 0.32) {
+        continue;
+      }
+
+      const smoke = this.pooledSmoke.pop();
+      if (!smoke) {
+        break;
+      }
+
+      const sway = Math.sin(this.emitterTime * 1.1) * (8 + intensity * 5);
+      const xJitter = (Math.random() - 0.5) * (32 + intensity * 26);
+      const yJitter = Math.random() * 8 - 14; // Keep smoke starting above the flame base.
+
+      smoke.reset(this.spawnX + sway + xJitter, this.spawnY + yJitter);
+      this.activeSmoke.push(smoke);
+    }
+  }
+
+  private updateFlames(deltaSeconds: number): void {
+    for (let i = this.activeFlames.length - 1; i >= 0; i--) {
+      const flame = this.activeFlames[i];
+      if (!flame.update(deltaSeconds)) {
+        continue;
+      }
+
+      flame.deactivate();
+      this.activeFlames.splice(i, 1);
+      this.pooledFlames.push(flame);
+    }
+  }
+
+  private updateSmoke(deltaSeconds: number): void {
+    for (let i = this.activeSmoke.length - 1; i >= 0; i--) {
+      const smoke = this.activeSmoke[i];
+      if (!smoke.update(deltaSeconds)) {
+        continue;
+      }
+
+      smoke.deactivate();
+      this.activeSmoke.splice(i, 1);
+      this.pooledSmoke.push(smoke);
+    }
+  }
 
   private createFlameTexture(): Texture {
-    // Build procedural radial gradient texture for particles.
-    const canvas = document.createElement("canvas"); // Allocate offscreen canvas element.
-    canvas.width = 128; // Set texture width.
-    canvas.height = 128; // Set texture height.
-    const context = canvas.getContext("2d"); // Acquire 2D drawing context.
+    const canvas = document.createElement("canvas");
+    canvas.width = 192;
+    canvas.height = 192;
+    const context = canvas.getContext("2d");
 
     if (!context) {
-      // Guard when 2D context creation fails.
-      return Texture.WHITE; // Fallback to white texture.
-    } // End context guard.
+      return Texture.WHITE;
+    }
 
-    const outerGlow = context.createRadialGradient(64, 78, 10, 64, 78, 60); // Create outer flame glow gradient.
-    outerGlow.addColorStop(0, "rgba(255, 170, 74, 0.9)"); // Add warm orange center stop.
-    outerGlow.addColorStop(0.35, "rgba(255, 95, 28, 0.62)"); // Add orange-red mid stop.
-    outerGlow.addColorStop(0.7, "rgba(178, 24, 14, 0.34)"); // Add darker red edge stop.
-    outerGlow.addColorStop(1, "rgba(70, 6, 8, 0)"); // Fade to transparent deep red.
-    context.fillStyle = outerGlow; // Select outer gradient fill style.
-    context.beginPath(); // Start path for outer circle.
-    context.arc(64, 78, 60, 0, Math.PI * 2); // Draw outer circular gradient area.
-    context.fill(); // Fill outer glow shape.
+    const outerGlow = context.createRadialGradient(96, 124, 16, 96, 124, 88);
+    outerGlow.addColorStop(0, "rgba(255, 194, 112, 0.86)");
+    outerGlow.addColorStop(0.4, "rgba(255, 124, 40, 0.54)");
+    outerGlow.addColorStop(0.72, "rgba(178, 26, 12, 0.28)");
+    outerGlow.addColorStop(1, "rgba(42, 2, 4, 0)");
+    context.fillStyle = outerGlow;
+    context.beginPath(); // Jagged outer shell for non-egg flame silhouette.
+    context.moveTo(96, 184);
+    context.lineTo(80, 150);
+    context.lineTo(58, 162);
+    context.lineTo(72, 122);
+    context.lineTo(46, 130);
+    context.lineTo(64, 88);
+    context.lineTo(76, 96);
+    context.lineTo(90, 34);
+    context.lineTo(108, 92);
+    context.lineTo(122, 80);
+    context.lineTo(146, 128);
+    context.lineTo(122, 122);
+    context.lineTo(138, 160);
+    context.lineTo(114, 148);
+    context.fill();
 
-    const innerCore = context.createRadialGradient(64, 70, 4, 64, 70, 28); // Create inner hot-core gradient.
-    innerCore.addColorStop(0, "rgba(240, 209, 29, 0.98)"); // Add hot yellow center stop.
-    innerCore.addColorStop(0.32, "rgba(132, 98, 11, 0.92)"); // Add darker yellow transition stop.
-    innerCore.addColorStop(0.7, "rgba(255, 40, 47, 0.5)"); // Add red transition stop.
-    innerCore.addColorStop(1, "rgba(71, 24, 20, 0)"); // Fade inner core to transparent ember tone.
-    context.fillStyle = innerCore; // Select inner gradient fill style.
-    context.beginPath(); // Start path for inner core circle.
-    context.arc(64, 70, 28, 0, Math.PI * 2); // Draw inner circular gradient area.
-    context.fill(); // Fill inner core shape.
+    const bodyGradient = context.createLinearGradient(96, 18, 96, 186);
+    bodyGradient.addColorStop(0, "rgba(255, 236, 170, 0)");
+    bodyGradient.addColorStop(0.2, "rgba(255, 216, 132, 0.2)");
+    bodyGradient.addColorStop(0.5, "rgba(255, 156, 50, 0.54)");
+    bodyGradient.addColorStop(0.82, "rgba(210, 42, 16, 0.34)");
+    bodyGradient.addColorStop(1, "rgba(60, 3, 5, 0)");
+    context.fillStyle = bodyGradient;
+    context.beginPath(); // Inner body with multiple tongues.
+    context.moveTo(96, 174);
+    context.lineTo(84, 140);
+    context.lineTo(72, 148);
+    context.lineTo(82, 114);
+    context.lineTo(64, 118);
+    context.lineTo(80, 86);
+    context.lineTo(90, 92);
+    context.lineTo(96, 42);
+    context.lineTo(102, 90);
+    context.lineTo(114, 84);
+    context.lineTo(130, 118);
+    context.lineTo(112, 114);
+    context.lineTo(122, 148);
+    context.lineTo(108, 140);
+    context.fill();
 
-    return Texture.from(canvas); // Convert canvas to PIXI texture and return.
-  } // End createFlameTexture.
-} // End PhoenixFlameBoard class.
+    const innerCore = context.createLinearGradient(96, 40, 96, 172);
+    innerCore.addColorStop(0, "rgba(255, 255, 244, 0.96)");
+    innerCore.addColorStop(0.34, "rgba(255, 236, 168, 0.9)");
+    innerCore.addColorStop(0.66, "rgba(255, 146, 36, 0.56)");
+    innerCore.addColorStop(1, "rgba(196, 28, 14, 0)");
+    context.fillStyle = innerCore;
+    context.beginPath(); // Hot center tongue.
+    context.moveTo(96, 48);
+    context.lineTo(108, 150);
+    context.lineTo(96, 138);
+    context.lineTo(84, 150);
+    context.fill();
+
+    const baseGlow = context.createRadialGradient(96, 168, 8, 96, 168, 52);
+    baseGlow.addColorStop(0, "rgba(255, 204, 120, 0.5)");
+    baseGlow.addColorStop(0.54, "rgba(255, 96, 24, 0.24)");
+    baseGlow.addColorStop(1, "rgba(76, 6, 8, 0)");
+    context.fillStyle = baseGlow;
+    context.beginPath();
+    context.ellipse(96, 170, 52, 16, 0, 0, Math.PI * 2);
+    context.fill();
+
+    return Texture.from(canvas);
+  }
+
+  private createSmokeTexture(): Texture {
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 160;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return Texture.WHITE;
+    }
+
+    const body = context.createRadialGradient(80, 88, 8, 80, 88, 66);
+    body.addColorStop(0, "rgba(118, 109, 102, 0.36)");
+    body.addColorStop(0.45, "rgba(74, 68, 64, 0.26)");
+    body.addColorStop(1, "rgba(20, 18, 18, 0)");
+    context.fillStyle = body;
+    context.beginPath();
+    context.arc(80, 88, 66, 0, Math.PI * 2);
+    context.fill();
+
+    const plume = context.createLinearGradient(80, 18, 80, 152);
+    plume.addColorStop(0, "rgba(124, 116, 108, 0)");
+    plume.addColorStop(0.28, "rgba(102, 95, 88, 0.2)");
+    plume.addColorStop(0.68, "rgba(70, 64, 60, 0.26)");
+    plume.addColorStop(1, "rgba(23, 21, 20, 0)");
+    context.fillStyle = plume;
+    context.beginPath();
+    context.ellipse(80, 86, 40, 56, 0, 0, Math.PI * 2);
+    context.fill();
+
+    return Texture.from(canvas);
+  }
+}
