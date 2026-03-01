@@ -125,7 +125,7 @@ export class AceOfShadowUIManager extends Container {
     // Counter - centered at top
     this.counterDisplay.anchor.set(0.5);
     this.counterDisplay.style.fontSize = 22;
-    this.counterDisplay.position.set(width / 2, 30);
+    this.counterDisplay.position.set(width / 2, 55);
 
     // Calculate grid layout parameters
     const isPortrait = width < height;

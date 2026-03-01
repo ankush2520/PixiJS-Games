@@ -49,7 +49,7 @@ export class AceOfShadowsScene extends BaseScene {
 
   resize(_width: number, _height: number): void {
     // Home button at top-left for both mobile and desktop
-    this.homeButton.position.set(16, 16);
+    this.homeButton.position.set(_width - 45 - 16, 16);
 
     this.uiManager.resize(_width, _height);
     this.board.resize(_width, _height);

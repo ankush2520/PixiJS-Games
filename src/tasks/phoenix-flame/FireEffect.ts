@@ -40,8 +40,8 @@ interface SmokeState {
 }
 
 export class FireEffect extends Container {
-  private static readonly MAX_FLAMES = 8;
-  private static readonly MAX_SMOKE = 2;
+  private static readonly MAX_FLAMES = 10;
+  private static readonly MAX_SMOKE = 10;
   private static readonly FLAME_SPAWN_RATE = 52;
   private static readonly SMOKE_SPAWN_RATE = 8;
   private static readonly RISE_SCALE = 0.82;
@@ -138,7 +138,7 @@ export class FireEffect extends Container {
 
   resize(width: number, height: number): void {
     this.spawnX = Math.round(width * 0.5);
-    this.spawnY = height * 0.84;
+    this.spawnY = height * 0.5;
   }
 
   update(delta: number): void {

@@ -46,10 +46,11 @@ export class MenuScene extends BaseScene {
   }
 
   resize(width: number, height: number): void {
-    this.menuText.position.set(width / 2, 60);
-    this.aceButton.position.set(width / 2, height / 2 - 90);
-    this.magicWordsButton.position.set(width / 2, height / 2);
-    this.phoenixFlameButton.position.set(width / 2, height / 2 + 90);
+    const centerY = height * 0.55;
+    this.menuText.position.set(width / 2, centerY - 150);
+    this.aceButton.position.set(width / 2, centerY - 45);
+    this.magicWordsButton.position.set(width / 2, centerY + 45);
+    this.phoenixFlameButton.position.set(width / 2, centerY + 135);
   }
 
   createMenuText(): void {

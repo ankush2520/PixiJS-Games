@@ -39,7 +39,7 @@ export class PhoenixFlameScene extends BaseScene {
       this.boardInitialized = true;
     }
     this.board.resize(width, height);
-    this.homeButton.position.set(16, 16);
+    this.homeButton.position.set(width - 45 - 16, 16);
   }
 
   update(dt: number): void {

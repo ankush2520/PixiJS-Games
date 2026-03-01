@@ -19,7 +19,7 @@ export class App {
     await this.app.init({
       resizeTo: window,
       antialias: true,
-      background: "#1099bb",
+      background: "#06080d",
     });
     this.app.renderer.events.features.wheel = true;
 

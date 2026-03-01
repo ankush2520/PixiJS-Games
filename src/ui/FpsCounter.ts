@@ -16,7 +16,7 @@ export class FpsCounter extends Container {
     });
 
     this.fpsText = new Text({ text: "FPS: 0", style });
-    this.fpsText.anchor.set(1, 0);
+    this.fpsText.anchor.set(0, 0);
     this.addChild(this.fpsText);
 
     this.resize();
@@ -35,7 +35,7 @@ export class FpsCounter extends Container {
       this.fpsText.style.fontSize = fontSize;
     }
 
-    this.position.set(this.app.screen.width - 8, 8);
+    this.position.set(8, 8);
   }
 
   update(deltaMS: number): void {
