@@ -35,7 +35,6 @@ export class AceOfShadowsScene extends BaseScene {
 
     if (!this.board.parent) {
       this.addChild(this.board);
-      this.uiManager.setBoard(this.board);
     }
 
     if (!this.uiManager.parent) {
@@ -55,6 +54,7 @@ export class AceOfShadowsScene extends BaseScene {
     this.board.resize(_width, _height);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   update(_dt: number): void {
     this.updateUI();
   }

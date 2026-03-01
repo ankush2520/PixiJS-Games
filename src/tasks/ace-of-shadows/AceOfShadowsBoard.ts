@@ -43,7 +43,7 @@ export class AceOfShadowsBoard extends Container {
 
   private createStackPlaceholders(isPortrait: boolean = false): void {
     // Save cards from all stacks before destroying
-    const savedCards: Array<any> = [];
+    const savedCards: Array<Container> = [];
     for (const stack of this.stacks) {
       // Skip placeholder at index 0, save actual cards
       for (let i = 1; i < stack.children.length; i++) {
@@ -52,7 +52,7 @@ export class AceOfShadowsBoard extends Container {
     }
 
     // Also save any cards that are being animated on the board
-    const animatedCards: Array<any> = [];
+    const animatedCards: Array<Container> = [];
     for (const child of this.children) {
       if (
         child !== this.stacks[0] &&
@@ -205,7 +205,10 @@ export class AceOfShadowsBoard extends Container {
     for (let i = this.children.length - 1; i >= 0; i--) {
       const child = this.children[i];
       // Check if it's a card (Graphics) and not a stack (Container)
-      if (child instanceof Graphics && !this.stacks.includes(child as any)) {
+      if (
+        child instanceof Graphics &&
+        !this.stacks.includes(child as Container)
+      ) {
         animatingCards.push(child);
       }
     }
@@ -322,7 +325,7 @@ export class AceOfShadowsBoard extends Container {
     this.animationFrameIds.add(frameId);
   }
 
-  destroy(options?: any): void {
+  destroy(options?: boolean): void {
     this.stopAnimation();
     super.destroy(options);
   }

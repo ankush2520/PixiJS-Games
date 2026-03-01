@@ -1,12 +1,9 @@
 import { Container, Text, TextStyle, Graphics } from "pixi.js";
-import { AceOfShadowsBoard } from "./AceOfShadowsBoard";
 
 export class AceOfShadowUIManager extends Container {
   private readonly startButton: Container;
   private readonly resetButton: Container;
   private readonly counterDisplay: Text;
-  private readonly titleDisplay: Text;
-  private board: AceOfShadowsBoard | null = null;
 
   constructor(
     private onStartClick: () => void,
@@ -16,17 +13,12 @@ export class AceOfShadowUIManager extends Container {
     this.startButton = this.createIconButton("play", 0x22c55e);
     this.resetButton = this.createIconButton("reset", 0xef4444);
     this.counterDisplay = this.createCounterDisplay();
-    this.titleDisplay = this.createTitleDisplay();
 
     this.addChild(this.startButton);
     this.addChild(this.resetButton);
     this.addChild(this.counterDisplay);
 
     this.setupEventListeners();
-  }
-
-  setBoard(board: AceOfShadowsBoard): void {
-    this.board = board;
   }
 
   private createIconButton(
@@ -91,17 +83,6 @@ export class AceOfShadowUIManager extends Container {
       style: new TextStyle({
         fontFamily: "Arial",
         fontSize: 18,
-        fill: 0xffffff,
-      }),
-    });
-  }
-
-  private createTitleDisplay(): Text {
-    return new Text({
-      text: "Ace of Shadows",
-      style: new TextStyle({
-        fontFamily: "Arial",
-        fontSize: 24,
         fill: 0xffffff,
       }),
     });
