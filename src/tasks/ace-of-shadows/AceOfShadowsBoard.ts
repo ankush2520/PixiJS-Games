@@ -44,7 +44,11 @@ export class AceOfShadowsBoard extends Container {
 
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = "white";
+
+      const dr = Math.max(0, r - 40);
+      const dg = Math.max(0, g - 40);
+      const db = Math.max(0, b - 40);
+      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
       ctx.lineWidth = 1;
       ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
 
@@ -152,27 +156,25 @@ export class AceOfShadowsBoard extends Container {
     this.ensureCardTextures();
     const firstStack = this.stacks[0];
 
+    const offsetPerCard = 0.3;
     for (let i = 0; i < 144; i++) {
       const card = new Sprite(this.cardTextures[i % this.cardTextures.length]);
       card.anchor.set(0.5);
 
-      const visibleIndex = Math.max(0, i - 129);
-      card.x = visibleIndex * 2;
-      card.y = visibleIndex * 2;
+      card.x = i * offsetPerCard;
+      card.y = i * offsetPerCard;
 
       firstStack.addChild(card);
     }
   }
 
   private relayoutStack(stack: Container): void {
+    const offsetPerCard = 0.3;
     let cardIndex = 0;
-    const totalCards = stack.children.length - 1;
-    const hiddenCount = Math.max(0, totalCards - 15);
     for (let i = 1; i < stack.children.length; i++) {
       const card = stack.children[i];
-      const visibleIndex = Math.max(0, cardIndex - hiddenCount);
-      card.x = visibleIndex * 2;
-      card.y = visibleIndex * 2;
+      card.x = cardIndex * offsetPerCard;
+      card.y = cardIndex * offsetPerCard;
       cardIndex++;
     }
   }
@@ -268,15 +270,14 @@ export class AceOfShadowsBoard extends Container {
 
     fromStack.removeChild(card);
     this.addChild(card);
+    this.movedCards++;
 
     const localPos = this.toLocal(globalPos);
     card.position.set(localPos.x, localPos.y);
 
     const targetStackCardCount = toStack.children.length - 1;
-    const hiddenCount = Math.max(0, targetStackCardCount - 15);
-    const visibleCardCount = Math.max(0, targetStackCardCount - hiddenCount);
-    const targetX = toStack.x + visibleCardCount * 2;
-    const targetY = toStack.y + visibleCardCount * 2;
+    const targetX = toStack.x + targetStackCardCount * 0.3;
+    const targetY = toStack.y + targetStackCardCount * 0.3;
 
     const startX = card.x;
     const startY = card.y;
@@ -308,7 +309,6 @@ export class AceOfShadowsBoard extends Container {
         this.removeChild(card);
         toStack.addChild(card);
         this.relayoutStack(toStack);
-        this.movedCards++;
       }
     };
 
