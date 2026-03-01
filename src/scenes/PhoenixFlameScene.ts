@@ -1,12 +1,12 @@
 import { BaseScene } from "../core/BaseScene";
 import { HomeButton } from "../ui/HomeButton";
-import { PhoenixFlameBoard } from "../tasks/phoenix-flame/PhoenixFlameBoard";
+import { FireEffect } from "../tasks/phoenix-flame/FireEffect";
 import { Graphics } from "pixi.js";
 
 export class PhoenixFlameScene extends BaseScene {
   private readonly background: Graphics;
   private readonly homeButton: HomeButton;
-  private readonly board: PhoenixFlameBoard;
+  private readonly board: FireEffect;
   private boardInitialized = false;
 
   constructor(private readonly onHomeSelected: () => void) {
@@ -15,7 +15,7 @@ export class PhoenixFlameScene extends BaseScene {
     this.homeButton = new HomeButton(() => {
       this.onHomeSelected();
     });
-    this.board = new PhoenixFlameBoard();
+    this.board = new FireEffect();
   }
 
   onEnter(): void {
@@ -34,12 +34,11 @@ export class PhoenixFlameScene extends BaseScene {
     this.background.clear();
     this.background.rect(0, 0, width, height).fill({ color: 0x06080d });
 
-    this.board.resize(width, height);
     if (!this.boardInitialized) {
       this.board.init();
       this.boardInitialized = true;
-      this.board.resize(width, height);
     }
+    this.board.resize(width, height);
     this.homeButton.position.set(16, 16);
   }
 
