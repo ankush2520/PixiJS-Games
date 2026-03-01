@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, Sprite, Texture } from "pixi.js";
 
 export class AceOfShadowsBoard extends Container {
   private readonly stackBasePositions: Array<{ x: number; y: number }> = [];
@@ -10,6 +10,12 @@ export class AceOfShadowsBoard extends Container {
   private lastHeight = 0;
   private animationFrameIds: Set<number> = new Set();
   private isAnimating = false;
+  private readonly cardTextures: Texture[] = [];
+  private static readonly CARD_WIDTH = 100;
+  private static readonly CARD_HEIGHT = 140;
+  private static readonly CARD_COLORS = [
+    0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181,
+  ];
 
   get cardsMovedCount(): number {
     return this.movedCards;
@@ -19,9 +25,34 @@ export class AceOfShadowsBoard extends Container {
     return this.stackBasePositions;
   }
 
+  private ensureCardTextures(): void {
+    if (this.cardTextures.length > 0) return;
+
+    for (const color of AceOfShadowsBoard.CARD_COLORS) {
+      const canvas = document.createElement("canvas");
+      canvas.width = AceOfShadowsBoard.CARD_WIDTH;
+      canvas.height = AceOfShadowsBoard.CARD_HEIGHT;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        this.cardTextures.push(Texture.WHITE);
+        continue;
+      }
+
+      const r = (color >> 16) & 0xff;
+      const g = (color >> 8) & 0xff;
+      const b = color & 0xff;
+
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+      this.cardTextures.push(Texture.from(canvas));
+    }
+  }
+
   resize(width: number, height: number): void {
-    // Desktop layout: center board with reserved space for UI
-    // Top padding: ~60px, Bottom padding: ~90px
     const topPadding = 60;
     const bottomPadding = 90;
     const availableHeight = height - topPadding - bottomPadding;
@@ -29,7 +60,6 @@ export class AceOfShadowsBoard extends Container {
 
     this.position.set(width / 2, boardCenterY);
 
-    // Detect orientation change and rebuild layout
     const isPortrait = width < height;
     const wasPortrait = this.lastWidth < this.lastHeight;
 
@@ -42,37 +72,26 @@ export class AceOfShadowsBoard extends Container {
   }
 
   private createStackPlaceholders(isPortrait: boolean = false): void {
-    // Save cards from all stacks before destroying
     const savedCards: Array<Container> = [];
     for (const stack of this.stacks) {
-      // Skip placeholder at index 0, save actual cards
       for (let i = 1; i < stack.children.length; i++) {
         savedCards.push(stack.children[i]);
       }
     }
 
-    // Also save any cards that are being animated on the board
     const animatedCards: Array<Container> = [];
     for (const child of this.children) {
       if (
-        child !== this.stacks[0] &&
-        child !== this.stacks[1] &&
-        child !== this.stacks[2] &&
-        child !== this.stacks[3] &&
-        child !== this.stacks[4] &&
-        child !== this.stacks[5]
+        child instanceof Sprite &&
+        !this.stacks.includes(child as Container)
       ) {
-        // This is likely a card being animated
-        if (child instanceof Graphics) {
-          animatedCards.push(child);
-        }
+        animatedCards.push(child);
       }
     }
 
     this.stackBasePositions.length = 0;
     for (const stack of this.stacks) {
       this.removeChild(stack);
-      // Remove children but don't destroy them (we saved them)
       while (stack.children.length > 0) {
         stack.removeChildAt(0);
       }
@@ -80,13 +99,8 @@ export class AceOfShadowsBoard extends Container {
     }
     this.stacks.length = 0;
 
-    const cardWidth = 100;
-    const cardHeight = 140;
     const spacingX = isPortrait ? 145 : 170;
     const spacingY = 180;
-
-    // Portrait mode: 2 columns, 3 rows
-    // Landscape mode: 3 columns, 2 rows
     const columns = isPortrait ? 2 : 3;
     const rows = isPortrait ? 3 : 2;
 
@@ -100,9 +114,13 @@ export class AceOfShadowsBoard extends Container {
         const stackContainer = new Container();
         stackContainer.position.set(x, y);
 
-        // Create placeholder using Graphics - outline only
         const stackBase = new Graphics();
-        stackBase.rect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
+        stackBase.rect(
+          -AceOfShadowsBoard.CARD_WIDTH / 2,
+          -AceOfShadowsBoard.CARD_HEIGHT / 2,
+          AceOfShadowsBoard.CARD_WIDTH,
+          AceOfShadowsBoard.CARD_HEIGHT,
+        );
         stackBase.stroke({ width: 2, color: 0xffffff, alpha: 0.4 });
 
         stackContainer.addChild(stackBase);
@@ -111,7 +129,6 @@ export class AceOfShadowsBoard extends Container {
       }
     }
 
-    // If we have saved cards, restore them to first stack
     if (savedCards.length > 0) {
       const firstStack = this.stacks[0];
       for (const card of savedCards) {
@@ -119,11 +136,9 @@ export class AceOfShadowsBoard extends Container {
       }
       this.relayoutStack(firstStack);
     } else {
-      // First time, populate with initial cards
       this.populateFirstStack();
     }
 
-    // Restore animated cards to board
     for (const card of animatedCards) {
       this.addChild(card);
     }
@@ -134,30 +149,24 @@ export class AceOfShadowsBoard extends Container {
       return;
     }
 
-    const cardWidth = 100;
-    const cardHeight = 140;
-    const colors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181];
+    this.ensureCardTextures();
     const firstStack = this.stacks[0];
 
     for (let i = 0; i < 144; i++) {
-      const cardGraphics = new Graphics();
-      cardGraphics.rect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
-      cardGraphics.fill(colors[i % colors.length]);
-      cardGraphics.stroke({ width: 1, color: 0xffffff });
+      const card = new Sprite(this.cardTextures[i % this.cardTextures.length]);
+      card.anchor.set(0.5);
 
-      // Only show top 15 cards for visual effect
       const visibleIndex = Math.max(0, i - 129);
-      cardGraphics.x = visibleIndex * 2;
-      cardGraphics.y = visibleIndex * 2;
+      card.x = visibleIndex * 2;
+      card.y = visibleIndex * 2;
 
-      firstStack.addChild(cardGraphics);
+      firstStack.addChild(card);
     }
   }
 
   private relayoutStack(stack: Container): void {
-    // Apply stacking layout to any stack - show top 15 cards with 2px offset
     let cardIndex = 0;
-    const totalCards = stack.children.length - 1; // exclude placeholder
+    const totalCards = stack.children.length - 1;
     const hiddenCount = Math.max(0, totalCards - 15);
     for (let i = 1; i < stack.children.length; i++) {
       const card = stack.children[i];
@@ -170,7 +179,7 @@ export class AceOfShadowsBoard extends Container {
 
   startAnimation(): void {
     if (this.moveInterval) {
-      return; // Already running
+      return;
     }
     this.isAnimating = true;
     this.moveInterval = setInterval(() => {
@@ -186,13 +195,11 @@ export class AceOfShadowsBoard extends Container {
       this.moveInterval = undefined;
     }
 
-    // Cancel all ongoing animation frames
     this.animationFrameIds.forEach((id) => cancelAnimationFrame(id));
     this.animationFrameIds.clear();
   }
 
   resetCards(): void {
-    // Stop all animations immediately
     this.stopAnimation();
 
     this.currentTargetStack = 1;
@@ -200,29 +207,24 @@ export class AceOfShadowsBoard extends Container {
 
     const firstStack = this.stacks[0];
 
-    // Collect all cards that are currently being animated (on the board)
-    const animatingCards: Graphics[] = [];
+    const animatingCards: Sprite[] = [];
     for (let i = this.children.length - 1; i >= 0; i--) {
       const child = this.children[i];
-      // Check if it's a card (Graphics) and not a stack (Container)
       if (
-        child instanceof Graphics &&
+        child instanceof Sprite &&
         !this.stacks.includes(child as Container)
       ) {
         animatingCards.push(child);
       }
     }
 
-    // Move animating cards to first stack immediately
     for (const card of animatingCards) {
       this.removeChild(card);
       firstStack.addChild(card);
     }
 
-    // Move all cards from other stacks back to first stack
     for (let i = 1; i < this.stacks.length; i++) {
       const stack = this.stacks[i];
-      // Get all cards (skip placeholder at index 0)
       while (stack.children.length > 1) {
         const card = stack.children[stack.children.length - 1];
         stack.removeChild(card);
@@ -230,7 +232,6 @@ export class AceOfShadowsBoard extends Container {
       }
     }
 
-    // Re-layout all stacks with consistent stacking behavior
     for (const stack of this.stacks) {
       this.relayoutStack(stack);
     }
@@ -240,7 +241,6 @@ export class AceOfShadowsBoard extends Container {
     const fromIndex = 0;
     const toIndex = this.currentTargetStack;
 
-    // Cycle through stacks 1-5
     this.currentTargetStack++;
     if (this.currentTargetStack >= this.stacks.length) {
       this.currentTargetStack = 1;
@@ -258,32 +258,26 @@ export class AceOfShadowsBoard extends Container {
     const fromStack = this.stacks[fromIndex];
     const toStack = this.stacks[toIndex];
 
-    // Get top card (last child, excluding placeholder at index 0)
     if (fromStack.children.length <= 1) {
       return;
     }
 
     const card = fromStack.children[fromStack.children.length - 1];
 
-    // Get global position
     const globalPos = card.getGlobalPosition();
 
-    // Remove from stack and add to board for animation
     fromStack.removeChild(card);
     this.addChild(card);
 
-    // Set card to its global position in board coordinates
     const localPos = this.toLocal(globalPos);
     card.position.set(localPos.x, localPos.y);
 
-    // Calculate target position - show top 15 cards spread out
-    const targetStackCardCount = toStack.children.length - 1; // exclude placeholder
+    const targetStackCardCount = toStack.children.length - 1;
     const hiddenCount = Math.max(0, targetStackCardCount - 15);
     const visibleCardCount = Math.max(0, targetStackCardCount - hiddenCount);
     const targetX = toStack.x + visibleCardCount * 2;
     const targetY = toStack.y + visibleCardCount * 2;
 
-    // Animate
     const startX = card.x;
     const startY = card.y;
     const startTime = Date.now();
@@ -293,7 +287,6 @@ export class AceOfShadowsBoard extends Container {
     let frameId: number;
 
     const animate = () => {
-      // Stop animation if reset was called
       if (!this.isAnimating) {
         this.animationFrameIds.delete(frameId);
         return;
@@ -302,7 +295,6 @@ export class AceOfShadowsBoard extends Container {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Ease out cubic
       const easeProgress = 1 - Math.pow(1 - progress, 3);
 
       card.x = startX + (targetX - startX) * easeProgress;
@@ -312,7 +304,6 @@ export class AceOfShadowsBoard extends Container {
         frameId = requestAnimationFrame(animate);
         this.animationFrameIds.add(frameId);
       } else {
-        // Animation complete
         this.animationFrameIds.delete(frameId);
         this.removeChild(card);
         toStack.addChild(card);
