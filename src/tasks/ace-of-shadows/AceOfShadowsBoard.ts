@@ -13,9 +13,10 @@ export class AceOfShadowsBoard extends Container {
   private readonly cardTextures: Texture[] = [];
   private static readonly CARD_WIDTH = 100;
   private static readonly CARD_HEIGHT = 140;
-  private static readonly CARD_COLORS = [
-    0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3, 0xf38181,
-  ];
+  private static readonly TOTAL_CARDS = 144;
+  private static readonly FIRST_STACK_FACE_COLOR = 0xf56f76;
+  private static readonly FIRST_STACK_OFFSET_X = -0.8;
+  private static readonly FIRST_STACK_OFFSET_Y = -0.8;
 
   get cardsMovedCount(): number {
     return this.movedCards;
@@ -28,7 +29,12 @@ export class AceOfShadowsBoard extends Container {
   private ensureCardTextures(): void {
     if (this.cardTextures.length > 0) return;
 
-    for (const color of AceOfShadowsBoard.CARD_COLORS) {
+    for (
+      let cardIndex = 0;
+      cardIndex < AceOfShadowsBoard.TOTAL_CARDS;
+      cardIndex++
+    ) {
+      const edgeColor = Math.floor(Math.random() * 0xffffff);
       const canvas = document.createElement("canvas");
       canvas.width = AceOfShadowsBoard.CARD_WIDTH;
       canvas.height = AceOfShadowsBoard.CARD_HEIGHT;
@@ -38,17 +44,23 @@ export class AceOfShadowsBoard extends Container {
         continue;
       }
 
-      const r = (color >> 16) & 0xff;
-      const g = (color >> 8) & 0xff;
-      const b = color & 0xff;
+      const faceColor = AceOfShadowsBoard.FIRST_STACK_FACE_COLOR;
+      const faceR = (faceColor >> 16) & 0xff;
+      const faceG = (faceColor >> 8) & 0xff;
+      const faceB = faceColor & 0xff;
 
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      const edgeR = (edgeColor >> 16) & 0xff;
+      const edgeG = (edgeColor >> 8) & 0xff;
+      const edgeB = edgeColor & 0xff;
+
+      ctx.fillStyle = `rgb(${faceR},${faceG},${faceB})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const dr = Math.max(0, r - 40);
-      const dg = Math.max(0, g - 40);
-      const db = Math.max(0, b - 40);
-      ctx.strokeStyle = `rgb(${dr},${dg},${db})`;
+      ctx.fillStyle = `rgb(${edgeR},${edgeG},${edgeB})`;
+      ctx.fillRect(0, 0, canvas.width, 2);
+      ctx.fillRect(0, 0, 2, canvas.height);
+
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.25)";
       ctx.lineWidth = 1;
       ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
 
@@ -104,7 +116,7 @@ export class AceOfShadowsBoard extends Container {
     this.stacks.length = 0;
 
     const spacingX = isPortrait ? 145 : 170;
-    const spacingY = 180;
+    const spacingY = isPortrait ? 180 : 210;
     const columns = isPortrait ? 2 : 3;
     const rows = isPortrait ? 3 : 2;
 
@@ -156,26 +168,33 @@ export class AceOfShadowsBoard extends Container {
     this.ensureCardTextures();
     const firstStack = this.stacks[0];
 
-    const offsetPerCard = 0.3;
-    for (let i = 0; i < 144; i++) {
-      const card = new Sprite(this.cardTextures[i % this.cardTextures.length]);
+    for (let i = 0; i < AceOfShadowsBoard.TOTAL_CARDS; i++) {
+      const card = new Sprite(this.cardTextures[i]);
       card.anchor.set(0.5);
 
-      card.x = i * offsetPerCard;
-      card.y = i * offsetPerCard;
+      const layerFromFront = AceOfShadowsBoard.TOTAL_CARDS - 1 - i;
+      card.x = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
+      card.y = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
 
       firstStack.addChild(card);
     }
   }
 
   private relayoutStack(stack: Container): void {
-    const offsetPerCard = 0.3;
-    let cardIndex = 0;
+    const isFirstStack = this.stacks.length > 0 && stack === this.stacks[0];
+
     for (let i = 1; i < stack.children.length; i++) {
       const card = stack.children[i];
-      card.x = cardIndex * offsetPerCard;
-      card.y = cardIndex * offsetPerCard;
-      cardIndex++;
+      if (isFirstStack) {
+        const layerFromFront = stack.children.length - 1 - i;
+        card.x = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
+        card.y = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
+        continue;
+      }
+
+      const cardIndex = i - 1;
+      card.x = cardIndex * 1.5;
+      card.y = cardIndex * 1.5;
     }
   }
 
@@ -239,6 +258,34 @@ export class AceOfShadowsBoard extends Container {
     }
   }
 
+  // TEMP: Quick test method to distribute all cards instantly
+  distributeAllCardsInstantly(): void {
+    this.stopAnimation();
+    const firstStack = this.stacks[0];
+    let targetStackIndex = 1;
+
+    // Move all cards except base from first stack
+    while (firstStack.children.length > 1) {
+      const card = firstStack.children[firstStack.children.length - 1];
+      const targetStack = this.stacks[targetStackIndex];
+
+      firstStack.removeChild(card);
+      targetStack.addChild(card);
+      this.movedCards++;
+
+      // Cycle through stacks
+      targetStackIndex++;
+      if (targetStackIndex >= this.stacks.length) {
+        targetStackIndex = 1;
+      }
+    }
+
+    // Relayout all stacks
+    for (const stack of this.stacks) {
+      this.relayoutStack(stack);
+    }
+  }
+
   moveCardWithAnimation(): void {
     const fromIndex = 0;
     const toIndex = this.currentTargetStack;
@@ -276,13 +323,13 @@ export class AceOfShadowsBoard extends Container {
     card.position.set(localPos.x, localPos.y);
 
     const targetStackCardCount = toStack.children.length - 1;
-    const targetX = toStack.x + targetStackCardCount * 0.3;
-    const targetY = toStack.y + targetStackCardCount * 0.3;
+    const targetX = toStack.x + targetStackCardCount * 1.5;
+    const targetY = toStack.y + targetStackCardCount * 1.5;
 
     const startX = card.x;
     const startY = card.y;
     const startTime = Date.now();
-    const duration = 2000;
+    const duration = 2000; // Reduced from 2000 for 100x faster testing
 
     this.isAnimating = true;
     let frameId: number;

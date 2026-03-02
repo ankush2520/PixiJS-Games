@@ -17,6 +17,7 @@ export class AceOfShadowsScene extends BaseScene {
     this.uiManager = new AceOfShadowUIManager(
       () => this.handleStartClick(),
       () => this.handleResetClick(),
+      () => this.handleTestClick(), // TEMP
     );
   }
 
@@ -26,6 +27,11 @@ export class AceOfShadowsScene extends BaseScene {
 
   private handleResetClick(): void {
     this.board.resetCards();
+  }
+
+  // TEMP: Quick test to distribute all cards
+  private handleTestClick(): void {
+    this.board.distributeAllCardsInstantly();
   }
 
   onEnter(): void {

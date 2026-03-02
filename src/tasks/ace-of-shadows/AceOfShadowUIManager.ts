@@ -3,26 +3,30 @@ import { Container, Text, TextStyle, Graphics } from "pixi.js";
 export class AceOfShadowUIManager extends Container {
   private readonly startButton: Container;
   private readonly resetButton: Container;
+  private readonly testButton: Container; // TEMP: for quick testing
   private readonly counterDisplay: Text;
 
   constructor(
     private onStartClick: () => void,
     private onResetClick: () => void,
+    private onTestClick: () => void, // TEMP: test callback
   ) {
     super();
     this.startButton = this.createIconButton("play", 0x22c55e);
     this.resetButton = this.createIconButton("reset", 0xef4444);
+    this.testButton = this.createIconButton("test", 0x3b82f6); // TEMP: blue button
     this.counterDisplay = this.createCounterDisplay();
 
     this.addChild(this.startButton);
     this.addChild(this.resetButton);
+    this.addChild(this.testButton); // TEMP
     this.addChild(this.counterDisplay);
 
     this.setupEventListeners();
   }
 
   private createIconButton(
-    iconType: "play" | "reset",
+    iconType: "play" | "reset" | "test",
     color: number,
   ): Container {
     const button = new Container();
@@ -68,6 +72,25 @@ export class AceOfShadowUIManager extends Container {
         18, // Back to point
       ]);
       icon.fill({ color: 0xffffff });
+    } else if (iconType === "test") {
+      // TEMP: Lightning bolt icon for quick test
+      icon.poly([
+        22.5,
+        12, // Top
+        20,
+        22.5, // Left middle
+        24,
+        22.5, // Center
+        19,
+        33, // Bottom left
+        25,
+        22.5, // Right of center
+        22.5,
+        22.5, // Center
+        22.5,
+        12, // Back to top
+      ]);
+      icon.fill({ color: 0xffffff });
     }
 
     button.addChild(icon);
@@ -95,6 +118,11 @@ export class AceOfShadowUIManager extends Container {
 
     this.resetButton.on("pointerdown", () => {
       this.onResetClick();
+    });
+
+    // TEMP: test button
+    this.testButton.on("pointerdown", () => {
+      this.onTestClick();
     });
   }
 
@@ -128,13 +156,17 @@ export class AceOfShadowUIManager extends Container {
     const buttonSize = 45;
     const buttonGap = isPortrait ? buttonSize * 0.75 : buttonSize * 1.5;
     const buttonSpacing = 20;
-    const totalWidth = buttonSize * 2 + buttonSpacing;
+    const totalWidth = buttonSize * 3 + buttonSpacing * 2; // TEMP: 3 buttons now
     const buttonsStartX = (width - totalWidth) / 2;
     const buttonsY = gridBottomY + buttonGap;
 
     this.startButton.position.set(buttonsStartX, buttonsY);
-    this.resetButton.position.set(
+    this.testButton.position.set(
       buttonsStartX + buttonSize + buttonSpacing,
+      buttonsY,
+    ); // TEMP
+    this.resetButton.position.set(
+      buttonsStartX + (buttonSize + buttonSpacing) * 2,
       buttonsY,
     );
   }
