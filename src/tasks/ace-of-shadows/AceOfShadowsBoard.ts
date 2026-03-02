@@ -11,12 +11,14 @@ export class AceOfShadowsBoard extends Container {
   private animationFrameIds: Set<number> = new Set();
   private isAnimating = false;
   private readonly cardTextures: Texture[] = [];
+  private cardScale = 1;
   private static readonly CARD_WIDTH = 100;
   private static readonly CARD_HEIGHT = 140;
   private static readonly TOTAL_CARDS = 144;
   private static readonly FIRST_STACK_FACE_COLOR = 0xf56f76;
-  private static readonly FIRST_STACK_OFFSET_X = -0.8;
-  private static readonly FIRST_STACK_OFFSET_Y = -0.8;
+  private static readonly FIRST_STACK_OFFSET_X = 0.32;
+  private static readonly FIRST_STACK_OFFSET_Y = 0.32;
+  private static readonly MOBILE_CARD_SCALE = 0.78;
 
   get cardsMovedCount(): number {
     return this.movedCards;
@@ -77,9 +79,19 @@ export class AceOfShadowsBoard extends Container {
     this.position.set(width / 2, boardCenterY);
 
     const isPortrait = width < height;
+    const targetCardScale = isPortrait
+      ? AceOfShadowsBoard.MOBILE_CARD_SCALE
+      : 1;
     const wasPortrait = this.lastWidth < this.lastHeight;
+    const cardScaleChanged = Math.abs(targetCardScale - this.cardScale) > 0.001;
 
-    if (isPortrait !== wasPortrait || this.lastWidth === 0) {
+    this.cardScale = targetCardScale;
+
+    if (
+      isPortrait !== wasPortrait ||
+      this.lastWidth === 0 ||
+      cardScaleChanged
+    ) {
       this.createStackPlaceholders(isPortrait);
     }
 
@@ -119,6 +131,8 @@ export class AceOfShadowsBoard extends Container {
     const spacingY = isPortrait ? 180 : 210;
     const columns = isPortrait ? 2 : 3;
     const rows = isPortrait ? 3 : 2;
+    const placeholderWidth = AceOfShadowsBoard.CARD_WIDTH * this.cardScale;
+    const placeholderHeight = AceOfShadowsBoard.CARD_HEIGHT * this.cardScale;
 
     for (let row = 0; row < rows; row++) {
       const y = (row - (rows - 1) / 2) * spacingY;
@@ -132,10 +146,10 @@ export class AceOfShadowsBoard extends Container {
 
         const stackBase = new Graphics();
         stackBase.rect(
-          -AceOfShadowsBoard.CARD_WIDTH / 2,
-          -AceOfShadowsBoard.CARD_HEIGHT / 2,
-          AceOfShadowsBoard.CARD_WIDTH,
-          AceOfShadowsBoard.CARD_HEIGHT,
+          -placeholderWidth / 2,
+          -placeholderHeight / 2,
+          placeholderWidth,
+          placeholderHeight,
         );
         stackBase.stroke({ width: 2, color: 0xffffff, alpha: 0.4 });
 
@@ -172,12 +186,27 @@ export class AceOfShadowsBoard extends Container {
       const card = new Sprite(this.cardTextures[i]);
       card.anchor.set(0.5);
 
-      const layerFromFront = AceOfShadowsBoard.TOTAL_CARDS - 1 - i;
-      card.x = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
-      card.y = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
+      const layout = this.getFirstStackCardLayout(
+        i,
+        AceOfShadowsBoard.TOTAL_CARDS,
+      );
+      card.x = layout.x;
+      card.y = layout.y;
+      card.scale.set(this.cardScale);
 
       firstStack.addChild(card);
     }
+  }
+
+  private getFirstStackCardLayout(
+    depthFromBase: number,
+    totalCards: number,
+  ): { x: number; y: number } {
+    void totalCards;
+    return {
+      x: depthFromBase * AceOfShadowsBoard.FIRST_STACK_OFFSET_X,
+      y: depthFromBase * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y,
+    };
   }
 
   private relayoutStack(stack: Container): void {
@@ -186,15 +215,20 @@ export class AceOfShadowsBoard extends Container {
     for (let i = 1; i < stack.children.length; i++) {
       const card = stack.children[i];
       if (isFirstStack) {
-        const layerFromFront = stack.children.length - 1 - i;
-        card.x = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
-        card.y = layerFromFront * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
+        const layout = this.getFirstStackCardLayout(
+          i - 1,
+          stack.children.length - 1,
+        );
+        card.x = layout.x;
+        card.y = layout.y;
+        (card as Sprite).scale.set(this.cardScale);
         continue;
       }
 
       const cardIndex = i - 1;
-      card.x = cardIndex * 1.5;
-      card.y = cardIndex * 1.5;
+      card.x = cardIndex * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
+      card.y = cardIndex * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
+      (card as Sprite).scale.set(this.cardScale);
     }
   }
 
@@ -258,34 +292,6 @@ export class AceOfShadowsBoard extends Container {
     }
   }
 
-  // TEMP: Quick test method to distribute all cards instantly
-  distributeAllCardsInstantly(): void {
-    this.stopAnimation();
-    const firstStack = this.stacks[0];
-    let targetStackIndex = 1;
-
-    // Move all cards except base from first stack
-    while (firstStack.children.length > 1) {
-      const card = firstStack.children[firstStack.children.length - 1];
-      const targetStack = this.stacks[targetStackIndex];
-
-      firstStack.removeChild(card);
-      targetStack.addChild(card);
-      this.movedCards++;
-
-      // Cycle through stacks
-      targetStackIndex++;
-      if (targetStackIndex >= this.stacks.length) {
-        targetStackIndex = 1;
-      }
-    }
-
-    // Relayout all stacks
-    for (const stack of this.stacks) {
-      this.relayoutStack(stack);
-    }
-  }
-
   moveCardWithAnimation(): void {
     const fromIndex = 0;
     const toIndex = this.currentTargetStack;
@@ -323,8 +329,20 @@ export class AceOfShadowsBoard extends Container {
     card.position.set(localPos.x, localPos.y);
 
     const targetStackCardCount = toStack.children.length - 1;
-    const targetX = toStack.x + targetStackCardCount * 1.5;
-    const targetY = toStack.y + targetStackCardCount * 1.5;
+    const isFirstStack = this.stacks.length > 0 && toStack === this.stacks[0];
+    let targetX =
+      toStack.x + targetStackCardCount * AceOfShadowsBoard.FIRST_STACK_OFFSET_X;
+    let targetY =
+      toStack.y + targetStackCardCount * AceOfShadowsBoard.FIRST_STACK_OFFSET_Y;
+
+    if (isFirstStack) {
+      const layout = this.getFirstStackCardLayout(
+        targetStackCardCount,
+        targetStackCardCount + 1,
+      );
+      targetX = toStack.x + layout.x;
+      targetY = toStack.y + layout.y;
+    }
 
     const startX = card.x;
     const startY = card.y;
