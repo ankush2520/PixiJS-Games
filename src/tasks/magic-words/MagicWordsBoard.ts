@@ -5,6 +5,31 @@ import { Scrollinghandler } from "./Scrollinghandler";
 const MAGIC_WORDS_API_URL =
   "https://private-624120-softgamesassignment.apiary-mock.com/v2/magicwords";
 
+/**
+ * API response data types
+ */
+interface DialogueItem {
+  name?: string;
+  text?: string;
+}
+
+interface EmojiItem {
+  name: string;
+  url: string;
+}
+
+interface AvatarItem {
+  name: string;
+  url: string;
+  position: "left" | "right";
+}
+
+interface MagicWordsApiResponse {
+  dialogue: DialogueItem[];
+  emojies: EmojiItem[];
+  avatars: AvatarItem[];
+}
+
 export class MagicWordsBoard extends Container {
   private readonly viewportContainer: Container;
   private readonly viewportBackground: Graphics;
@@ -13,9 +38,9 @@ export class MagicWordsBoard extends Container {
   private readonly scrollbarTrack: Graphics;
   private readonly scrollbarThumb: Graphics;
   private readonly scrollinghandler: Scrollinghandler;
-  private dialogue: any[] = [];
-  private emojies: any[] = [];
-  private avatars: any[] = [];
+  private dialogue: DialogueItem[] = [];
+  private emojies: EmojiItem[] = [];
+  private avatars: AvatarItem[] = [];
   private emojiUrlByName = new Map<string, string>();
   private avatarByName = new Map<
     string,
@@ -87,7 +112,7 @@ export class MagicWordsBoard extends Container {
 
   async loadData(): Promise<void> {
     const response = await fetch(MAGIC_WORDS_API_URL);
-    const data = await response.json();
+    const data = (await response.json()) as MagicWordsApiResponse;
 
     this.dialogue = data.dialogue;
     this.emojies = data.emojies;
@@ -140,7 +165,7 @@ export class MagicWordsBoard extends Container {
     let nextY = 0;
 
     for (let index = 0; index < this.dialogue.length; index++) {
-      const item = this.dialogue[index] as { name?: string; text?: string };
+      const item = this.dialogue[index];
       const speakerName = item.name ?? "Unknown";
       const messageText = item.text ?? "";
       const avatarData = this.avatarByName.get(speakerName);
