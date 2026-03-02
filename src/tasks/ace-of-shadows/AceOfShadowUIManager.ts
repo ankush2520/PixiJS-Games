@@ -39,7 +39,6 @@ export class AceOfShadowUIManager extends Container {
     const icon = new Graphics();
 
     if (iconType === "play") {
-      // Play triangle icon (pointing right)
       icon.poly([
         18,
         14, // Top left
@@ -56,7 +55,6 @@ export class AceOfShadowUIManager extends Container {
       icon.arc(22.5, 22.5, 8, 0.5, Math.PI * 2 - 0.5);
       icon.stroke({ width: 2.5, color: 0xffffff });
 
-      // Arrow head pointing right at the top
       icon.poly([
         30.5,
         18, // Arrow point
@@ -116,7 +114,6 @@ export class AceOfShadowUIManager extends Container {
     const firstRowOffset = ((rows - 1) / 2) * spacingY;
     const topCardY = boardCenterY - firstRowOffset - cardHeight / 2;
 
-    // Counter - vertically centered between top screen edge and top card
     this.counterDisplay.anchor.set(0.5);
     this.counterDisplay.style.fontSize = 22;
     this.counterDisplay.position.set(width / 2, topCardY / 2);

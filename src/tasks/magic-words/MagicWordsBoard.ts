@@ -13,11 +13,8 @@ export class MagicWordsBoard extends Container {
   private readonly scrollbarTrack: Graphics;
   private readonly scrollbarThumb: Graphics;
   private readonly scrollinghandler: Scrollinghandler;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private dialogue: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private emojies: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private avatars: any[] = [];
   private emojiUrlByName = new Map<string, string>();
   private avatarByName = new Map<
