@@ -54,8 +54,8 @@ export class AceOfShadowsScene extends BaseScene {
     this.board.resize(_width, _height);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  update(_dt: number): void {
+  update(dt: number): void {
+    void dt;
     this.updateUI();
   }
 }
